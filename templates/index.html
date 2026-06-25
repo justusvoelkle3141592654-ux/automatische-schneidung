@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automatische Schneidung</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <rect width="32" height="32" rx="8" fill="url(#grad)"/>
+      <path d="M8 10h4v12H8zM14 10h4v12h-4zM20 10l6 6-6 6V10z" fill="white"/>
+      <defs>
+        <linearGradient id="grad" x1="0" y1="0" x2="32" y2="32">
+          <stop offset="0%" stop-color="#8b5cf6"/>
+          <stop offset="100%" stop-color="#ec4899"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    <span>Automatische Schneidung</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Step 1: Upload -->
+  <section id="step-upload" class="step active">
+    <h2 class="step-title"><span class="step-num">1</span>Videos hochladen</h2>
+    <p class="step-sub">Bis zu 20 Videos – einfach reinziehen oder klicken</p>
+
+    <div id="drop-zone" class="drop-zone">
+      <input type="file" id="file-input" accept="video/*" multiple hidden />
+      <div class="drop-icon">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="23" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
+          <path d="M24 14v14M17 21l7-7 7 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M14 33h20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <p class="drop-primary">Videos hierher ziehen</p>
+      <p class="drop-secondary">oder klicken zum Auswählen · MP4, MOV, AVI, MKV, WebM</p>
+    </div>
+
+    <div id="upload-progress-wrap" class="upload-progress-wrap hidden">
+      <div class="upload-bar-track">
+        <div id="upload-bar" class="upload-bar"></div>
+      </div>
+      <span id="upload-label" class="upload-label">Hochladen…</span>
+    </div>
+
+    <div id="video-grid" class="video-grid hidden"></div>
+
+    <div id="upload-actions" class="upload-actions hidden">
+      <button id="add-more-btn" class="btn btn-ghost">+ Weitere hinzufügen</button>
+      <button id="next-btn" class="btn btn-primary">Weiter zum Stil →</button>
+    </div>
+  </section>
+
+  <!-- Step 2: Preset selection -->
+  <section id="step-style" class="step hidden">
+    <h2 class="step-title"><span class="step-num">2</span>Stil wählen</h2>
+    <p class="step-sub">Alles wird automatisch angepasst – du wählst nur den Look</p>
+
+    <div class="preset-grid">
+
+      <label class="preset-card" data-preset="cinematic">
+        <input type="radio" name="preset" value="cinematic" checked hidden />
+        <div class="preset-preview cinematic">
+          <div class="preview-bars">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="preset-info">
+          <span class="preset-name">Cinematisch</span>
+          <span class="preset-desc">Warm & dramatisch · sanfte Übergänge</span>
+        </div>
+        <div class="preset-check">✓</div>
+      </label>
+
+      <label class="preset-card" data-preset="energetisch">
+        <input type="radio" name="preset" value="energetisch" hidden />
+        <div class="preset-preview energetisch">
+          <div class="preview-bars">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="preset-info">
+          <span class="preset-name">Energetisch</span>
+          <span class="preset-desc">Schnelle Schnitte · lebendige Farben</span>
+        </div>
+        <div class="preset-check">✓</div>
+      </label>
+
+      <label class="preset-card" data-preset="vintage">
+        <input type="radio" name="preset" value="vintage" hidden />
+        <div class="preset-preview vintage">
+          <div class="preview-bars">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="preset-info">
+          <span class="preset-name">Vintage</span>
+          <span class="preset-desc">Warme Retro-Töne · weiche Blenden</span>
+        </div>
+        <div class="preset-check">✓</div>
+      </label>
+
+      <label class="preset-card" data-preset="modern">
+        <input type="radio" name="preset" value="modern" hidden />
+        <div class="preset-preview modern">
+          <div class="preview-bars">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="preset-info">
+          <span class="preset-name">Modern</span>
+          <span class="preset-desc">Klares Bild · glatte Wisch-Übergänge</span>
+        </div>
+        <div class="preset-check">✓</div>
+      </label>
+
+      <label class="preset-card" data-preset="dramatisch">
+        <input type="radio" name="preset" value="dramatisch" hidden />
+        <div class="preset-preview dramatisch">
+          <div class="preview-bars">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="preset-info">
+          <span class="preset-name">Dramatisch</span>
+          <span class="preset-desc">Hoher Kontrast · dunkle Atmosphäre</span>
+        </div>
+        <div class="preset-check">✓</div>
+      </label>
+
+      <label class="preset-card" data-preset="warm">
+        <input type="radio" name="preset" value="warm" hidden />
+        <div class="preset-preview warm">
+          <div class="preview-bars">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="preset-info">
+          <span class="preset-name">Warm & Golden</span>
+          <span class="preset-desc">Goldener Ton · Kreis-Übergänge</span>
+        </div>
+        <div class="preset-check">✓</div>
+      </label>
+
+    </div>
+
+    <div class="style-actions">
+      <button id="back-btn" class="btn btn-ghost">← Zurück</button>
+      <button id="process-btn" class="btn btn-primary btn-large">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M10 2v4M10 14v4M2 10h4M14 10h4M4.22 4.22l2.83 2.83M12.95 12.95l2.83 2.83M4.22 15.78l2.83-2.83M12.95 7.05l2.83-2.83" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        Automatisch schneiden
+      </button>
+    </div>
+  </section>
+
+  <!-- Step 3: Processing -->
+  <section id="step-processing" class="step hidden">
+    <div class="processing-content">
+      <div class="spinner"></div>
+      <h2 id="processing-title">Verarbeite Videos…</h2>
+      <p id="processing-msg" class="processing-msg">Starte…</p>
+      <div class="progress-track">
+        <div id="progress-bar" class="progress-bar" style="width:0%"></div>
+      </div>
+      <span id="progress-pct" class="progress-pct">0%</span>
+    </div>
+  </section>
+
+  <!-- Step 4: Done -->
+  <section id="step-done" class="step hidden">
+    <div class="done-content">
+      <div class="done-icon">
+        <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+          <circle cx="32" cy="32" r="30" stroke="url(#dg)" stroke-width="3"/>
+          <path d="M18 32l10 10 18-18" stroke="url(#dg)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="dg" x1="0" y1="0" x2="64" y2="64">
+              <stop offset="0%" stop-color="#8b5cf6"/>
+              <stop offset="100%" stop-color="#ec4899"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <h2>Dein Video ist fertig!</h2>
+      <p>Alle Clips wurden automatisch zusammengeschnitten und mit Effekten versehen.</p>
+      <div class="done-actions">
+        <a id="download-link" class="btn btn-primary btn-large" download>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 2v10M6 9l4 5 4-5M3 16h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Video herunterladen
+        </a>
+        <button id="restart-btn" class="btn btn-ghost">Neues Video erstellen</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
