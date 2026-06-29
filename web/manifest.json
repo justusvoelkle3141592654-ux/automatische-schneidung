@@ -1,6 +1,6 @@
 {
-  "name": "CYD Wetter & Notizen",
-  "version": "1.0.0",
+  "name": "CYD Mini-Apps (Notizen, Quiz, Snake)",
+  "version": "2.0.0",
   "builds": [
     {
       "chipFamily": "ESP32",

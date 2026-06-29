@@ -3,141 +3,61 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CYD Wetter &amp; Notizen – Installieren</title>
+  <title>CYD Mini-Apps &ndash; Installieren</title>
   <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #0d1117;
-      color: #e6edf3;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px 20px;
-    }
-    .card {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 12px;
-      padding: 40px;
-      max-width: 560px;
-      width: 100%;
-    }
-    h1 {
-      font-size: 1.8rem;
-      color: #00d4ff;
-      margin-bottom: 8px;
-    }
-    .subtitle {
-      color: #8b949e;
-      margin-bottom: 32px;
-      font-size: 0.95rem;
-    }
-    .features {
-      list-style: none;
-      margin-bottom: 36px;
-    }
-    .features li {
-      padding: 10px 0;
-      border-bottom: 1px solid #21262d;
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-    }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; color: #e6edf3;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 40px; max-width: 560px; width: 100%; }
+    h1 { font-size: 1.8rem; color: #00d4ff; margin-bottom: 8px; }
+    .subtitle { color: #8b949e; margin-bottom: 28px; font-size: 0.95rem; }
+    .badge { display:inline-block; background:#13351f; color:#3fb950; border:1px solid #238636;
+      font-size:.78rem; padding:4px 10px; border-radius:20px; margin-bottom:26px; }
+    .features { list-style: none; margin-bottom: 36px; }
+    .features li { padding: 10px 0; border-bottom: 1px solid #21262d; display: flex; gap: 12px; align-items: flex-start; }
     .features li:last-child { border-bottom: none; }
     .icon { font-size: 1.4rem; flex-shrink: 0; }
     .feat-title { font-weight: 600; margin-bottom: 2px; }
     .feat-desc { font-size: 0.85rem; color: #8b949e; }
-    .install-section {
-      background: #0d1117;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      padding: 24px;
-      text-align: center;
-      margin-bottom: 28px;
-    }
-    .install-section p {
-      margin-bottom: 20px;
-      color: #8b949e;
-      font-size: 0.9rem;
-    }
-    esp-web-install-button {
-      --esp-tools-button-color: #00d4ff;
-      --esp-tools-button-text-color: #0d1117;
-      font-size: 1.1rem;
-    }
-    .steps {
-      counter-reset: step;
-    }
-    .steps li {
-      counter-increment: step;
-      padding: 10px 0 10px 40px;
-      position: relative;
-      border-bottom: 1px solid #21262d;
-      font-size: 0.9rem;
-      color: #c9d1d9;
-    }
+    .install-section { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 28px; }
+    .install-section p { margin-bottom: 20px; color: #8b949e; font-size: 0.9rem; }
+    esp-web-install-button { --esp-tools-button-color: #00d4ff; --esp-tools-button-text-color: #0d1117; font-size: 1.1rem; }
+    .steps { counter-reset: step; }
+    .steps li { counter-increment: step; padding: 10px 0 10px 40px; position: relative; border-bottom: 1px solid #21262d; font-size: 0.9rem; color: #c9d1d9; }
     .steps li:last-child { border-bottom: none; }
-    .steps li::before {
-      content: counter(step);
-      position: absolute;
-      left: 0;
-      top: 10px;
-      background: #00d4ff;
-      color: #0d1117;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 0.8rem;
-    }
-    .note {
-      margin-top: 20px;
-      padding: 12px 16px;
-      background: #1c2128;
-      border-left: 3px solid #f0883e;
-      border-radius: 4px;
-      font-size: 0.85rem;
-      color: #e3b341;
-    }
-    footer {
-      margin-top: 32px;
-      color: #484f58;
-      font-size: 0.8rem;
-      text-align: center;
-    }
+    .steps li::before { content: counter(step); position: absolute; left: 0; top: 10px; background: #00d4ff; color: #0d1117;
+      width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; }
+    .note { margin-top: 20px; padding: 12px 16px; background: #1c2128; border-left: 3px solid #f0883e; border-radius: 4px; font-size: 0.85rem; color: #e3b341; }
+    footer { margin-top: 32px; color: #484f58; font-size: 0.8rem; text-align: center; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>&#9729;&#160; CYD Wetter &amp; Notizen</h1>
+    <h1>&#127918;&#160; CYD Mini-Apps</h1>
     <p class="subtitle">Firmware fuer das ESP32-2432S028R (Cheap Yellow Display)</p>
+    <div class="badge">&#10003; Funktioniert komplett offline &ndash; kein WLAN noetig</div>
 
     <ul class="features">
       <li>
-        <span class="icon">&#127780;</span>
-        <div>
-          <div class="feat-title">Echtzeit-Wetter</div>
-          <div class="feat-desc">Zeigt Temperatur, Wetterlage und Luftfeuchtigkeit. Automatische Aktualisierung alle 10 Minuten. Kein API-Schlussel notwendig.</div>
-        </div>
-      </li>
-      <li>
         <span class="icon">&#128221;</span>
         <div>
-          <div class="feat-title">Notizen-Tastatur</div>
-          <div class="feat-desc">Tippe Notizen direkt auf dem Touchscreen. Alle Notizen bleiben auch nach dem Ausschalten gespeichert.</div>
+          <div class="feat-title">Notizen</div>
+          <div class="feat-desc">Mehrere Notizen anlegen, in der Liste durchscrollen, per Touch-Tastatur schreiben und einzeln loeschen. Bleibt nach dem Ausschalten gespeichert.</div>
         </div>
       </li>
       <li>
-        <span class="icon">&#128246;</span>
+        <span class="icon">&#129504;</span>
         <div>
-          <div class="feat-title">Einfaches WLAN-Setup</div>
-          <div class="feat-desc">Beim ersten Start oeffnet das Display einen eigenen Hotspot. Stadt und WLAN-Passwort einmal eingeben &ndash; fertig.</div>
+          <div class="feat-title">Quiz</div>
+          <div class="feat-desc">5 Fragen rund um den 3D-Druck mit Auswahl-Antworten und Punktestand. Direkt auf dem Display spielbar.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#128013;</span>
+        <div>
+          <div class="feat-title">Snake</div>
+          <div class="feat-desc">Der Retro-Klassiker. Mit dem Finger steuern (in die gewuenschte Richtung tippen), mit gespeichertem Highscore.</div>
         </div>
       </li>
     </ul>
@@ -153,10 +73,7 @@
       <li>Auf <strong style="color:#00d4ff">"Auf CYD installieren"</strong> klicken</li>
       <li>Im Browser-Fenster den richtigen USB-Port auswaehlen und bestaetigen</li>
       <li>Warten bis die Installation abgeschlossen ist (~1 Minute)</li>
-      <li>CYD startet neu und zeigt <em>"CYD-Setup"</em> als WLAN-Hotspot</li>
-      <li>Mit dem Handy mit <strong>CYD-Setup</strong> verbinden</li>
-      <li>Browser oeffnen &rarr; <strong>192.168.4.1</strong> &rarr; WLAN + Stadt eingeben</li>
-      <li>Fertig! Das Wetter wird sofort angezeigt.</li>
+      <li>Fertig! Oben am Display zwischen <em>Notizen</em>, <em>Quiz</em> und <em>Snake</em> umschalten.</li>
     </ol>
 
     <div class="note">
