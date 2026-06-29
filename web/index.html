@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CYD Wetter &amp; Notizen – Installieren</title>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 40px;
+      max-width: 560px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 1.8rem;
+      color: #00d4ff;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #8b949e;
+      margin-bottom: 32px;
+      font-size: 0.95rem;
+    }
+    .features {
+      list-style: none;
+      margin-bottom: 36px;
+    }
+    .features li {
+      padding: 10px 0;
+      border-bottom: 1px solid #21262d;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .features li:last-child { border-bottom: none; }
+    .icon { font-size: 1.4rem; flex-shrink: 0; }
+    .feat-title { font-weight: 600; margin-bottom: 2px; }
+    .feat-desc { font-size: 0.85rem; color: #8b949e; }
+    .install-section {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .install-section p {
+      margin-bottom: 20px;
+      color: #8b949e;
+      font-size: 0.9rem;
+    }
+    esp-web-install-button {
+      --esp-tools-button-color: #00d4ff;
+      --esp-tools-button-text-color: #0d1117;
+      font-size: 1.1rem;
+    }
+    .steps {
+      counter-reset: step;
+    }
+    .steps li {
+      counter-increment: step;
+      padding: 10px 0 10px 40px;
+      position: relative;
+      border-bottom: 1px solid #21262d;
+      font-size: 0.9rem;
+      color: #c9d1d9;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 10px;
+      background: #00d4ff;
+      color: #0d1117;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+    .note {
+      margin-top: 20px;
+      padding: 12px 16px;
+      background: #1c2128;
+      border-left: 3px solid #f0883e;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #e3b341;
+    }
+    footer {
+      margin-top: 32px;
+      color: #484f58;
+      font-size: 0.8rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>&#9729;&#160; CYD Wetter &amp; Notizen</h1>
+    <p class="subtitle">Firmware fuer das ESP32-2432S028R (Cheap Yellow Display)</p>
+
+    <ul class="features">
+      <li>
+        <span class="icon">&#127780;</span>
+        <div>
+          <div class="feat-title">Echtzeit-Wetter</div>
+          <div class="feat-desc">Zeigt Temperatur, Wetterlage und Luftfeuchtigkeit. Automatische Aktualisierung alle 10 Minuten. Kein API-Schlussel notwendig.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#128221;</span>
+        <div>
+          <div class="feat-title">Notizen-Tastatur</div>
+          <div class="feat-desc">Tippe Notizen direkt auf dem Touchscreen. Alle Notizen bleiben auch nach dem Ausschalten gespeichert.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#128246;</span>
+        <div>
+          <div class="feat-title">Einfaches WLAN-Setup</div>
+          <div class="feat-desc">Beim ersten Start oeffnet das Display einen eigenen Hotspot. Stadt und WLAN-Passwort einmal eingeben &ndash; fertig.</div>
+        </div>
+      </li>
+    </ul>
+
+    <div class="install-section">
+      <p>CYD per USB-Kabel an den Computer anschliessen, dann auf den Knopf druecken:</p>
+      <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
+    </div>
+
+    <h2 style="font-size:1rem; margin-bottom:14px; color:#8b949e;">So geht's Schritt fuer Schritt</h2>
+    <ol class="steps">
+      <li>CYD per USB-Kabel an den PC anschliessen</li>
+      <li>Auf <strong style="color:#00d4ff">"Auf CYD installieren"</strong> klicken</li>
+      <li>Im Browser-Fenster den richtigen USB-Port auswaehlen und bestaetigen</li>
+      <li>Warten bis die Installation abgeschlossen ist (~1 Minute)</li>
+      <li>CYD startet neu und zeigt <em>"CYD-Setup"</em> als WLAN-Hotspot</li>
+      <li>Mit dem Handy mit <strong>CYD-Setup</strong> verbinden</li>
+      <li>Browser oeffnen &rarr; <strong>192.168.4.1</strong> &rarr; WLAN + Stadt eingeben</li>
+      <li>Fertig! Das Wetter wird sofort angezeigt.</li>
+    </ol>
+
+    <div class="note">
+      &#9888; Benoetigt Chrome oder Edge (Web Serial). Firefox und Safari werden nicht unterstuetzt.
+    </div>
+  </div>
+
+  <footer>ESP32-2432S028R &#183; ILI9341 &#183; ESP Web Tools</footer>
+</body>
+</html>

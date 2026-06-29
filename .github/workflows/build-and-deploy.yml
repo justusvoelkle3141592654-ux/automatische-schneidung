@@ -1,0 +1,57 @@
+name: Firmware bauen und Website deployen
+
+on:
+  push:
+    branches:
+      - claude/cyd-weather-notes-app-ksbqoa
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: PlatformIO Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('cyd-firmware/platformio.ini') }}
+
+      - name: PlatformIO installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+
+      - name: Firmware kompilieren
+        run: cd cyd-firmware && pio run -e cyd
+
+      - name: Firmware-Binaries in Web-Verzeichnis kopieren
+        run: |
+          mkdir -p web/firmware
+          cp cyd-firmware/.pio/build/cyd/firmware.bin   web/firmware/
+          cp cyd-firmware/.pio/build/cyd/bootloader.bin web/firmware/
+          cp cyd-firmware/.pio/build/cyd/partitions.bin web/firmware/
+          BOOT_APP=$(find ~/.platformio -name "boot_app0.bin" \
+            -path "*/framework-arduinoespressif32/*" | head -1)
+          if [ -z "$BOOT_APP" ]; then
+            echo "FEHLER: boot_app0.bin nicht gefunden!"
+            exit 1
+          fi
+          cp "$BOOT_APP" web/firmware/
+          echo "Kopierte Dateien:"
+          ls -lh web/firmware/
+
+      - name: Auf GitHub Pages deployen
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./web
+          force_orphan: true
+          commit_message: "Firmware und Website aktualisiert"
