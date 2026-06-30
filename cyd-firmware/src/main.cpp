@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include "photos.h"
 #include <WiFi.h>
+#include <WebServer.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
@@ -245,24 +246,14 @@ unsigned long swLastDraw = 0;
 // ── WLAN ─────────────────────────────────────────
 String wifiSsid = "";
 String wifiPass = "";
-int    wifiEditField = 0;     // 0 = SSID-Feld, 1 = Passwort-Feld
-bool   wifiShift     = false;
-bool   wifiDigitMode = false;
 String wifiStatusMsg = "";
-const char* WKEY_LETTERS[3][10] = {
-  {"q","w","e","r","t","z","u","i","o","p"},
-  {"a","s","d","f","g","h","j","k","l","-"},
-  {"y","x","c","v","b","n","m",".","_","@"}
-};
-const char* WKEY_DIGITS[3][10] = {
-  {"1","2","3","4","5","6","7","8","9","0"},
-  {"!","#","$","%","&","*","(",")","+","="},
-  {"/",":",";","?","~","[","]","{","}","^"}
-};
+const char* WIFI_AP_SSID = "CYD-Setup";
+WebServer wifiServer(80);
+bool wifiApActive = false;
 bool wifiIsConnected() { return WiFi.status() == WL_CONNECTED; }
 bool wifiTryConnect(unsigned long timeoutMs) {
     if (wifiSsid.length() == 0) { wifiStatusMsg = "Keine SSID gespeichert"; return false; }
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(wifiApActive ? WIFI_AP_STA : WIFI_STA);
     WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
     unsigned long t0 = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - t0 < timeoutMs) delay(200);
@@ -277,6 +268,83 @@ void wifiLoadCreds() {
 void wifiSaveCreds() {
     prefs.putString("wssid", wifiSsid);
     prefs.putString("wpass", wifiPass);
+}
+String wifiHtmlEscape(const String& s) {
+    String out; out.reserve(s.length());
+    for (unsigned int i = 0; i < s.length(); i++) {
+        char c = s[i];
+        if (c == '&') out += "&amp;";
+        else if (c == '"') out += "&quot;";
+        else if (c == '<') out += "&lt;";
+        else if (c == '>') out += "&gt;";
+        else out += c;
+    }
+    return out;
+}
+void drawWifiSetup();
+void wifiHandleRoot() {
+    String html =
+        "<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"UTF-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+        "<title>CYD WLAN einrichten</title><style>"
+        "body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#e6edf3;"
+        "display:flex;justify-content:center;padding:32px 16px;margin:0;}"
+        ".card{background:#161b22;border:1px solid #30363d;border-radius:12px;"
+        "padding:28px;max-width:380px;width:100%;box-sizing:border-box;}"
+        "h1{font-size:1.3rem;color:#00d4ff;margin:0 0 18px;}"
+        "label{display:block;font-size:.85rem;color:#8b949e;margin:14px 0 4px;}"
+        "input{width:100%;padding:10px;border-radius:6px;border:1px solid #30363d;"
+        "background:#0d1117;color:#e6edf3;font-size:1rem;box-sizing:border-box;}"
+        "button{margin-top:22px;width:100%;padding:12px;border:none;border-radius:8px;"
+        "background:#00d4ff;color:#0d1117;font-weight:700;font-size:1rem;cursor:pointer;}"
+        "</style></head><body><div class=\"card\">"
+        "<h1>CYD WLAN einrichten</h1>"
+        "<form action=\"/save\" method=\"POST\">"
+        "<label>WLAN-Name (SSID)</label>"
+        "<input name=\"ssid\" value=\"" + wifiHtmlEscape(wifiSsid) + "\" required autofocus>"
+        "<label>WLAN-Passwort</label>"
+        "<input name=\"pass\" type=\"password\" placeholder=\"(leer = offenes WLAN)\">"
+        "<button type=\"submit\">Verbinden</button>"
+        "</form></div></body></html>";
+    wifiServer.send(200, "text/html; charset=utf-8", html);
+}
+void wifiHandleSave() {
+    if (wifiServer.hasArg("ssid")) wifiSsid = wifiServer.arg("ssid");
+    if (wifiServer.hasArg("pass")) wifiPass = wifiServer.arg("pass");
+    wifiSaveCreds();
+    wifiStatusMsg = "Verbinde...";
+    drawWifiSetup();
+    bool ok = wifiTryConnect(10000);
+    drawWifiSetup();
+    String html =
+        "<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"UTF-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+        "<title>CYD WLAN</title><style>"
+        "body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#e6edf3;"
+        "display:flex;justify-content:center;padding:32px 16px;margin:0;text-align:center;}"
+        "a{color:#00d4ff;}</style></head><body><div>" +
+        String(ok
+            ? "<h2 style=\"color:#3fb950\">Verbunden!</h2><p>IP-Adresse: " + WiFi.localIP().toString() + "</p>"
+            : "<h2 style=\"color:#f85149\">Verbindung fehlgeschlagen</h2><p>Bitte SSID/Passwort pruefen.</p>") +
+        "<p style=\"margin-top:20px;\"><a href=\"/\">Zurueck</a></p></div></body></html>";
+    wifiServer.send(200, "text/html; charset=utf-8", html);
+}
+void wifiStartSetupAP() {
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAP(WIFI_AP_SSID);
+    wifiServer.on("/", HTTP_GET, wifiHandleRoot);
+    wifiServer.on("/save", HTTP_POST, wifiHandleSave);
+    wifiServer.onNotFound(wifiHandleRoot);
+    wifiServer.begin();
+    wifiApActive = true;
+    wifiStatusMsg = wifiIsConnected() ? ("Verbunden: " + WiFi.localIP().toString()) : "Warte auf Eingabe im Browser...";
+}
+void wifiStopSetupAP() {
+    if (!wifiApActive) return;
+    wifiServer.stop();
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_STA);
+    wifiApActive = false;
 }
 void drawWifiIcon(int x, int y) {
     uint16_t col = wifiIsConnected() ? COL_GOOD : COL_MUTE;
@@ -500,6 +568,7 @@ void setup() {
 
 // ═══════════════════════════════════════════════
 void loop() {
+    if (wifiApActive) wifiServer.handleClient();
     if (currentScreen == SCR_SNAKE && !snOver &&
         millis() - snLastMove > (unsigned long)SN_SPEED) {
         snLastMove = millis();
@@ -1363,118 +1432,43 @@ void drawSettings() {
 void settingsHandleTouch(int x, int y) {
     if (handleHomeTap(x, y)) return;
     if (y >= 50 && y <= 106 && x >= 30 && x <= 290) { runCalibration(); switchScreen(SCR_HOME); return; }
-    if (y >= 118 && y <= 174 && x >= 30 && x <= 290) { switchScreen(SCR_WIFI_SETUP); return; }
+    if (y >= 118 && y <= 174 && x >= 30 && x <= 290) { wifiStartSetupAP(); switchScreen(SCR_WIFI_SETUP); return; }
 }
 
-// ══ WLAN EINRICHTEN (eigene Tastatur mit Buchstaben/Ziffern) ══
-void drawWifiKeyboard(TFT_eSPI& g) {
-    const char* (*rows)[10] = wifiDigitMode ? WKEY_DIGITS : WKEY_LETTERS;
-    for (int r = 0; r < 3; r++) {
-        for (int c = 0; c < 10; c++) {
-            int kx = c * KEY_W, ky = KBD_Y + r * KEY_H;
-            bool isDel = (r == 1 && c == 9);
-            uint16_t col = isDel ? COL_BAD : COL_KEY;
-            g.fillRoundRect(kx + 1, ky + 1, KEY_W - 2, KEY_H - 2, 4, col);
-            g.setTextColor(COL_TEXT, col); g.setTextSize(1);
-            if (isDel) { g.drawString("DEL", kx + 5, ky + 12); continue; }
-            String lbl = rows[r][c];
-            if (!wifiDigitMode && wifiShift) lbl.toUpperCase();
-            g.drawString(lbl, kx + 11, ky + 12);
-        }
-    }
-    int ky3 = KBD_Y + KEY_H * 3;
-    g.fillRoundRect(1, ky3 + 1, 62, KEY_H - 2, 4, wifiDigitMode ? COL_ACCENT2 : COL_KEYSP);
-    g.setTextColor(COL_TEXT, wifiDigitMode ? COL_ACCENT2 : COL_KEYSP); g.setTextSize(1);
-    g.drawString(wifiDigitMode ? "ABC" : "123", 14, ky3 + 12);
-
-    g.fillRoundRect(65, ky3 + 1, 62, KEY_H - 2, 4, wifiShift ? COL_ACCENT2 : COL_KEYSP);
-    g.setTextColor(COL_TEXT, wifiShift ? COL_ACCENT2 : COL_KEYSP);
-    g.drawString("SHIFT", 72, ky3 + 12);
-
-    g.fillRoundRect(129, ky3 + 1, 126, KEY_H - 2, 4, COL_KEYSP);
-    g.setTextColor(COL_TEXT, COL_KEYSP);
-    g.drawString("LEERTASTE", 150, ky3 + 12);
-
-    g.fillRoundRect(257, ky3 + 1, 62, KEY_H - 2, 4, COL_GOOD);
-    g.setTextColor(COL_DARK, COL_GOOD);
-    g.drawString("OK", 275, ky3 + 12);
-}
+// ══ WLAN EINRICHTEN (Hotspot + Browser-Formular, kein Touch-Tippen mehr) ══
 void drawWifiSetup() {
-    TFT_eSPI& g = sprOK ? (TFT_eSPI&)spr : tft;
-    g.fillScreen(COL_BG);
-    drawHomeIcon(g, 2, 3);
-    g.fillRoundRect(32, 3, 110, 24, 8, COL_GOOD);
-    g.setTextSize(1); g.setTextColor(COL_DARK, COL_GOOD);
-    g.drawString("Verbinden", 50, 11);
+    tft.fillScreen(COL_BG);
+    drawHomeIcon(tft, 2, 3);
+    tft.fillRoundRect(32, 3, 90, 24, 8, COL_CARD2);
+    tft.setTextSize(1); tft.setTextColor(COL_TEXT, COL_CARD2);
+    tft.drawString("Zurueck", 48, 11);
 
-    g.fillRoundRect(8, 30, 152, 26, 6, wifiEditField == 0 ? COL_ACCENT2 : COL_CARD2);
-    g.setTextColor(COL_TEXT, wifiEditField == 0 ? COL_ACCENT2 : COL_CARD2); g.setTextSize(1);
-    String ssidShown = wifiSsid.length() ? wifiSsid : "(SSID eingeben)";
-    g.drawString("SSID: " + ssidShown, 14, 40);
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT, COL_BG);
+    tft.drawString("WLAN einrichten", 60, 34);
 
-    g.fillRoundRect(166, 30, 146, 26, 6, wifiEditField == 1 ? COL_ACCENT2 : COL_CARD2);
-    g.setTextColor(COL_TEXT, wifiEditField == 1 ? COL_ACCENT2 : COL_CARD2);
-    String passMasked = "";
-    for (unsigned int i = 0; i < wifiPass.length(); i++) passMasked += "*";
-    g.drawString("Pass: " + (wifiPass.length() ? passMasked : String("(optional)")), 172, 40);
+    tft.setTextSize(1); tft.setTextColor(COL_MUTE, COL_BG);
+    tft.drawString("1. Mit diesem WLAN verbinden:", 18, 70);
+    tft.setTextSize(2); tft.setTextColor(COL_ACCENT, COL_BG);
+    tft.drawString(WIFI_AP_SSID, 18, 86);
 
-    g.setTextColor(COL_MUTE, COL_BG);
-    g.drawString(wifiStatusMsg, 8, 60);
+    tft.setTextSize(1); tft.setTextColor(COL_MUTE, COL_BG);
+    tft.drawString("2. Im Browser oeffnen:", 18, 116);
+    tft.setTextSize(2); tft.setTextColor(COL_ACCENT2, COL_BG);
+    tft.drawString("http://192.168.4.1", 18, 132);
 
-    drawWifiKeyboard(g);
-    if (sprOK) spr.pushSprite(0, 0);
-}
-void wifiKeyTap(const String& ch) {
-    String& field = (wifiEditField == 0) ? wifiSsid : wifiPass;
-    if (field.length() < 32) field += ch;
+    tft.setTextSize(1); tft.setTextColor(wifiIsConnected() ? COL_GOOD : COL_MUTE, COL_BG);
+    tft.drawString(wifiStatusMsg, 18, 170);
+
+    if (wifiSsid.length()) {
+        tft.setTextColor(COL_MUTE, COL_BG);
+        tft.drawString("Gespeichert: " + wifiSsid, 18, 188);
+    }
 }
 void wifiHandleTouch(int x, int y) {
     if (y < TAB_H) {
-        if (x < 32) { switchScreen(SCR_SETTINGS); return; }
-        if (x < 142) {
-            wifiSaveCreds();
-            wifiStatusMsg = "Verbinde...";
-            drawWifiSetup();
-            bool ok = wifiTryConnect(10000);
-            drawWifiSetup();
-            if (ok) { delay(600); switchScreen(SCR_SETTINGS); }
-            return;
-        }
-        return;
+        if (x < 32) { wifiStopSetupAP(); switchScreen(SCR_HOME); return; }
+        if (x < 122) { wifiStopSetupAP(); switchScreen(SCR_SETTINGS); return; }
     }
-    if (y >= 30 && y <= 56) {
-        if (x < 160) wifiEditField = 0; else wifiEditField = 1;
-        drawWifiSetup();
-        return;
-    }
-    if (y < KBD_Y) return;
-    int row = (y - KBD_Y) / KEY_H;
-    if (row < 0 || row > 3) return;
-    if (row < 3) {
-        int col = constrain(x / KEY_W, 0, 9);
-        if (row == 1 && col == 9) {
-            String& field = (wifiEditField == 0) ? wifiSsid : wifiPass;
-            if (field.length() > 0) field.remove(field.length() - 1);
-            drawWifiSetup();
-            return;
-        }
-        const char* (*rows)[10] = wifiDigitMode ? WKEY_DIGITS : WKEY_LETTERS;
-        String lbl = rows[row][col];
-        if (!wifiDigitMode && wifiShift) lbl.toUpperCase();
-        wifiKeyTap(lbl);
-        drawWifiSetup();
-        return;
-    }
-    // row 3: mode toggle / shift / space / OK
-    if (x < 64) { wifiDigitMode = !wifiDigitMode; drawWifiSetup(); return; }
-    if (x < 128) { wifiShift = !wifiShift; drawWifiSetup(); return; }
-    if (x < 256) { wifiKeyTap(" "); drawWifiSetup(); return; }
-    wifiSaveCreds();
-    wifiStatusMsg = "Verbinde...";
-    drawWifiSetup();
-    bool ok = wifiTryConnect(10000);
-    drawWifiSetup();
-    if (ok) { delay(600); switchScreen(SCR_SETTINGS); }
 }
 
 // ══ TICTACTOE ═════════════════════════════════════
