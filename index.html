@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CYD Mini-Apps &ndash; Installieren</title>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 40px;
+      max-width: 560px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 1.8rem;
+      color: #00d4ff;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #8b949e;
+      margin-bottom: 32px;
+      font-size: 0.95rem;
+    }
+    .features {
+      list-style: none;
+      margin-bottom: 36px;
+    }
+    .features li {
+      padding: 10px 0;
+      border-bottom: 1px solid #21262d;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .features li:last-child { border-bottom: none; }
+    .icon { font-size: 1.4rem; flex-shrink: 0; }
+    .feat-title { font-weight: 600; margin-bottom: 2px; }
+    .feat-desc { font-size: 0.85rem; color: #8b949e; }
+    .install-section {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .install-section p {
+      margin-bottom: 20px;
+      color: #8b949e;
+      font-size: 0.9rem;
+    }
+    esp-web-install-button {
+      --esp-tools-button-color: #00d4ff;
+      --esp-tools-button-text-color: #0d1117;
+      font-size: 1.1rem;
+    }
+    .fake-btn {
+      display: inline-block;
+      background: #00d4ff;
+      color: #0d1117;
+      font-weight: 700;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+    .steps {
+      counter-reset: step;
+    }
+    .steps li {
+      counter-increment: step;
+      padding: 10px 0 10px 40px;
+      position: relative;
+      border-bottom: 1px solid #21262d;
+      font-size: 0.9rem;
+      color: #c9d1d9;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 10px;
+      background: #00d4ff;
+      color: #0d1117;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+    .note {
+      margin-top: 20px;
+      padding: 12px 16px;
+      background: #1c2128;
+      border-left: 3px solid #f0883e;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #e3b341;
+    }
+    footer {
+      margin-top: 32px;
+      color: #484f58;
+      font-size: 0.8rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>&#127918;&#160; CYD Mini-Apps</h1>
+    <p class="subtitle">Firmware fuer das ESP32-2432S028R (Cheap Yellow Display) &ndash; Home-Menue, Spiele, Quiz, Notizen, Bilder, Rechner, Stoppuhr, Nachrichten, WM 2026 &amp; TicTacToe</p>
+
+    <ul class="features">
+      <li>
+        <span class="icon">&#127968;</span>
+        <div>
+          <div class="feat-title">Home-Menue mit 9 Kacheln</div>
+          <div class="feat-desc">Spiele, Quiz, Notizen, Bilder, Rechner, Stoppuhr, News, WM 2026 und TicTacToe &ndash; alles auf einen Blick. Ueber das Zahnrad oben rechts geht's zu den Einstellungen (Touch-Kalibrierung &amp; WLAN).</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#128225;</span>
+        <div>
+          <div class="feat-title">WLAN-Verbindung (optional)</div>
+          <div class="feat-desc">Fuer Nachrichten und WM-Daten braucht der CYD WLAN. Dazu oeffnet der CYD selbst einen WLAN-Hotspot namens "CYD-Setup" &ndash; damit verbinden, im Browser <strong>http://192.168.4.1</strong> aufrufen und dort SSID &amp; Passwort eingeben. Wird dauerhaft gespeichert. Alle anderen Apps funktionieren weiterhin komplett offline.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#127918;</span>
+        <div>
+          <div class="feat-title">Spiele: Snake &amp; Flappy Bird</div>
+          <div class="feat-desc">Eine Auswahl-Seite, dann geht's los: Snake mit Fingersteuerung oder Flappy Bird per Antippen &ndash; jetzt mit fluessiger, flackerfreier Darstellung und bunterem Himmel/Boden. Beide mit gespeichertem Highscore.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#10067;</span>
+        <div>
+          <div class="feat-title">Quiz mit 5 Kategorien</div>
+          <div class="feat-desc">3D-Druck, Technik, Allgemeinwissen, Tiere und Wissen &ndash; jetzt in einer hochformatigen Karte mit mehr Hintergrundfarbe, bunten Antwort-Kacheln und Punktestand.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#128221;</span>
+        <div>
+          <div class="feat-title">Notizen mit einklappbarer Tastatur</div>
+          <div class="feat-desc">Liste mit allen Notizen, Bearbeiten per Touch-Tastatur &ndash; jetzt flackerfrei dank Doppelpufferung. Die Tastatur laesst sich ueber einen Knopf ein- und ausklappen, damit mehr Platz fuer den Text bleibt. Bleibt nach dem Ausschalten gespeichert.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#128247;</span>
+        <div>
+          <div class="feat-title">Bilder-Galerie</div>
+          <div class="feat-desc">Echte Fotos der Katze zum Durchblaettern mit Pfeiltasten &ndash; sechs Bilder, direkt auf dem Display.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#128290;</span>
+        <div>
+          <div class="feat-title">Rechner</div>
+          <div class="feat-desc">Einfacher Taschenrechner mit Touch-Tastenfeld fuer Grundrechenarten.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#9201;</span>
+        <div>
+          <div class="feat-title">Stoppuhr</div>
+          <div class="feat-desc">Start, Stopp und Zuruecksetzen per Antippen, mit laufender Zeitanzeige.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#128240;</span>
+        <div>
+          <div class="feat-title">Nachrichten von ARD, ZDF, WDR &amp; Zeit Online</div>
+          <div class="feat-desc">Scrollbare Liste der aktuellsten Meldungen aus vier Quellen. Antippen zeigt Titel, Beschreibung und ein echtes Foto zur Meldung. Benoetigt WLAN.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#9917;</span>
+        <div>
+          <div class="feat-title">WM 2026 Liveticker &amp; Gewinn-Wahrscheinlichkeit</div>
+          <div class="feat-desc">Laufende WM-Spiele mit Spielstand und aktueller Minute, sonst die naechsten anstehenden Spiele. Pro Spiel laesst sich eine Gewinn-Wahrscheinlichkeit (Sieg/Unentschieden/Sieg) als Balkendiagramm laden. Daten von api-football.com, benoetigt WLAN.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#10060;</span>
+        <div>
+          <div class="feat-title">TicTacToe</div>
+          <div class="feat-desc">Gegen eine eingebaute KI oder lokal zu zweit auf demselben Geraet spielen &ndash; komplett offline.</div>
+        </div>
+      </li>
+    </ul>
+
+    <div class="install-section">
+      <p>CYD per USB-Kabel an den Computer anschliessen, dann auf den Knopf druecken:</p>
+      <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
+      <noscript><span class="fake-btn">Auf CYD installieren</span></noscript>
+    </div>
+
+    <h2 style="font-size:1rem; margin-bottom:14px; color:#8b949e;">So geht's Schritt fuer Schritt</h2>
+    <ol class="steps">
+      <li>CYD per USB-Kabel an den PC anschliessen</li>
+      <li>Auf <strong style="color:#00d4ff">"Auf CYD installieren"</strong> klicken</li>
+      <li>Im Browser-Fenster den richtigen USB-Port auswaehlen und bestaetigen</li>
+      <li>Warten bis die Installation abgeschlossen ist (~1 Minute)</li>
+      <li>CYD startet neu und zeigt das Home-Menue mit den neun Kacheln</li>
+      <li>Tippe auf <em>Spiele</em>, <em>Quiz</em>, <em>Notizen</em>, <em>Bilder</em>, <em>Rechner</em>, <em>Stoppuhr</em> oder <em>TicTacToe</em>, um diese Apps sofort offline zu nutzen</li>
+      <li>Fuer <em>News</em> und <em>WM 2026</em>: oben rechts auf das Zahnrad tippen &rarr; <em>WLAN einrichten</em> &rarr; auf dem Handy/PC mit dem WLAN <strong>"CYD-Setup"</strong> verbinden &rarr; im Browser <strong>http://192.168.4.1</strong> oeffnen &rarr; SSID und Passwort eintragen &rarr; <em>Verbinden</em></li>
+      <li>Fertig! Die meisten Apps laufen komplett offline, News und WM 2026 brauchen einmalig WLAN.</li>
+    </ol>
+
+    <div class="note">
+      &#9888; Benoetigt Chrome oder Edge (Web Serial). Firefox und Safari werden nicht unterstuetzt.
+    </div>
+  </div>
+
+  <footer>ESP32-2432S028R &#183; ILI9341 &#183; ESP Web Tools</footer>
+</body>
+</html>
