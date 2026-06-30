@@ -11,7 +11,6 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-#include <TJpg_Decoder.h>
 
 // Wird beim CI-Build per GitHub-Secret als Compiler-Flag gesetzt
 // (siehe platformio.ini / build-and-deploy.yml). Lokal ohne Secret leer.
@@ -359,7 +358,8 @@ void drawWifiIcon(int x, int y) {
 // ── HTTP/JSON-Hilfsfunktion (HTTPS ohne Zertifikatspruefung -
 //    fuer einen Hobby-Geraet ausreichend, da nur oeffentliche,
 //    nicht-sensible Daten abgerufen werden) ──────────
-bool httpGetJson(const String& url, DynamicJsonDocument& doc, const char* apiKeyHeader = nullptr) {
+bool httpGetJson(const String& url, DynamicJsonDocument& doc, const char* apiKeyHeader = nullptr,
+                  JsonDocument* filter = nullptr) {
     if (!wifiIsConnected()) return false;
     WiFiClientSecure client;
     client.setInsecure();
@@ -370,7 +370,9 @@ bool httpGetJson(const String& url, DynamicJsonDocument& doc, const char* apiKey
     int code = http.GET();
     bool ok = false;
     if (code == 200) {
-        DeserializationError err = deserializeJson(doc, http.getStream());
+        DeserializationError err = filter
+            ? deserializeJson(doc, http.getStream(), DeserializationOption::Filter(*filter))
+            : deserializeJson(doc, http.getStream());
         ok = !err;
     }
     http.end();
@@ -380,7 +382,7 @@ bool httpGetJson(const String& url, DynamicJsonDocument& doc, const char* apiKey
 // ── Nachrichten (RSS: ARD/Tagesschau, ZDF, WDR, Zeit Online) ──
 #define NEWS_MAX 16
 #define NEWS_SOURCES 4
-struct NewsItem { String title; String desc; String imgUrl; String source; };
+struct NewsItem { String title; String desc; String source; };
 NewsItem newsItems[NEWS_MAX];
 int  newsCount  = 0;
 int  newsScroll = 0;
@@ -460,7 +462,6 @@ int  tttBestMove();
 void tttDrawCell(int i);
 void tttFinishCheck();
 void drawTttStatus();
-bool tjpgOutputCb(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap);
 void newsFetchAll();
 void drawNewsList();
 void drawNewsDetail();
@@ -531,10 +532,6 @@ void setup() {
     randomSeed(esp_random());
     initHomeTiles();
     wifiLoadCreds();
-
-    TJpgDec.setJpgScale(1);
-    TJpgDec.setSwapBytes(true);
-    TJpgDec.setCallback(tjpgOutputCb);
 
     touchCal = prefs.getBool("tcal", false);
     if (touchCal) {
@@ -1628,18 +1625,6 @@ String xmlTagContent(const String& s, const String& tag) {
     if (closeStart < 0) return "";
     return s.substring(tagEnd + 1, closeStart);
 }
-String xmlAttr(const String& s, const String& tagStart, const String& attr) {
-    int p = s.indexOf(tagStart);
-    if (p < 0) return "";
-    int tagClose = s.indexOf('>', p);
-    if (tagClose < 0) tagClose = s.length();
-    int attrPos = s.indexOf(attr + "=\"", p);
-    if (attrPos < 0 || attrPos > tagClose) return "";
-    int vs = attrPos + attr.length() + 2;
-    int ve = s.indexOf('"', vs);
-    if (ve < 0) return "";
-    return s.substring(vs, ve);
-}
 String xmlClean(String s) {
     s.trim();
     if (s.startsWith("<![CDATA[")) {
@@ -1675,12 +1660,8 @@ void newsFetchAll() {
                 String title = xmlClean(xmlTagContent(itemXml, "title"));
                 if (title.length() == 0) continue;
                 String desc = xmlClean(xmlTagContent(itemXml, "description"));
-                String img = xmlAttr(itemXml, "<enclosure", "url");
-                if (img.length() == 0) img = xmlAttr(itemXml, "<media:thumbnail", "url");
-                if (img.length() == 0) img = xmlAttr(itemXml, "<media:content", "url");
                 newsItems[newsCount].title  = title.length() > 110 ? title.substring(0, 110) : title;
                 newsItems[newsCount].desc   = desc.length() > 280 ? desc.substring(0, 280) : desc;
-                newsItems[newsCount].imgUrl = img;
                 newsItems[newsCount].source = NEWS_SOURCE_NAMES[s];
                 newsCount++; perSource++;
             }
@@ -1744,46 +1725,6 @@ void drawNewsList() {
         tft.fillTriangle(ax + 11, by + 70, ax + 4, by + 54, ax + 18, by + 54, COL_ACCENT);
     }
 }
-// Direkter Empfang+Dekodierung eines JPEG-Thumbnails (nur fuer die
-// Detailansicht, nicht fuer die Liste, um Speicher/Bandbreite zu sparen).
-bool newsThumbReady = false;
-bool tjpgOutputCb(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) {
-    tft.pushImage(x, y, w, h, bitmap);
-    return true;
-}
-void newsDrawThumb(const String& url, int x, int y, int boxW, int boxH) {
-    tft.fillRoundRect(x, y, boxW, boxH, 8, COL_CARD2);
-    if (url.length() == 0 || !wifiIsConnected()) return;
-    WiFiClientSecure client; client.setInsecure();
-    HTTPClient http;
-    http.setTimeout(8000);
-    if (!http.begin(client, url)) return;
-    int code = http.GET();
-    if (code == 200) {
-        int len = http.getSize();
-        if (len > 0 && len < 60000) {
-            uint8_t* buf = (uint8_t*)malloc(len);
-            if (buf) {
-                WiFiClient* stream = http.getStreamPtr();
-                int got = stream->readBytes(buf, len);
-                if (got == len) {
-                    uint16_t jw, jh;
-                    TJpgDec.getJpgSize(&jw, &jh, buf, len);
-                    uint8_t scale = 1;
-                    while ((jw / scale) > boxW || (jh / scale) > boxH) scale *= 2;
-                    if (scale > 8) scale = 8;
-                    TJpgDec.setJpgScale(scale);
-                    TJpgDec.setCallback(tjpgOutputCb);
-                    int dx = x + (boxW - (int)(jw / scale)) / 2;
-                    int dy = y + (boxH - (int)(jh / scale)) / 2;
-                    TJpgDec.drawJpg(dx, dy, buf, len);
-                }
-                free(buf);
-            }
-        }
-    }
-    http.end();
-}
 void drawNewsDetail() {
     if (newsSel < 0 || newsSel >= newsCount) { switchScreen(SCR_NEWS_LIST); return; }
     NewsItem& it = newsItems[newsSel];
@@ -1795,13 +1736,11 @@ void drawNewsDetail() {
     tft.setTextColor(COL_ACCENT, COL_BG);
     tft.drawString(it.source, 230, 11);
 
-    newsDrawThumb(it.imgUrl, 8, 32, 80, 80);
-
     tft.setTextColor(COL_TEXT, COL_BG); tft.setTextSize(1);
-    drawWrapped(it.title, 96, 34, 35, 12);
+    drawWrapped(it.title, 8, 34, 50, 12);
 
     tft.setTextColor(COL_MUTE, COL_BG);
-    drawWrapped(it.desc, 8, 118, 52, 12);
+    drawWrapped(it.desc, 8, 70, 52, 12);
 }
 void newsHandleTouch(int x, int y) {
     if (handleHomeTap(x, y)) return;
@@ -1831,13 +1770,33 @@ void newsHandleTouch(int x, int y) {
 }
 
 // ══ WM 2026 (Liveticker + Gewinn-Wahrscheinlichkeit, eine App) ══
+// api-football liefert pro Spiel sehr viel mehr Felder als wir brauchen;
+// ohne Filter sprengt das die JSON-Puffergroesse und das Parsen schlaegt
+// (besonders bei mehreren parallelen Spielen) mit NoMemory fehl, wodurch
+// "Neu laden" nie Spiele anzeigt. Der Filter laesst nur die genutzten
+// Felder ueberhaupt erst in den Puffer einlesen.
+JsonDocument& wmFixtureFilter() {
+    static DynamicJsonDocument f(512);
+    if (f.isNull()) {
+        JsonObject item = f["response"][0].to<JsonObject>();
+        item["fixture"]["id"] = true;
+        item["fixture"]["date"] = true;
+        item["fixture"]["status"]["short"] = true;
+        item["fixture"]["status"]["elapsed"] = true;
+        item["teams"]["home"]["name"] = true;
+        item["teams"]["away"]["name"] = true;
+        item["goals"]["home"] = true;
+        item["goals"]["away"] = true;
+    }
+    return f;
+}
 void wmFetchFixtures() {
     wmCount = 0; wmSel = -1;
     if (!wifiIsConnected()) return;
-    DynamicJsonDocument doc(16384);
+    DynamicJsonDocument doc(8192);
     String url = "https://v3.football.api-sports.io/fixtures?league=1&season=2026&live=all";
     wmIsLive = false;
-    if (httpGetJson(url, doc, API_FOOTBALL_KEY)) {
+    if (httpGetJson(url, doc, API_FOOTBALL_KEY, &wmFixtureFilter())) {
         JsonArray arr = doc["response"].as<JsonArray>();
         if (arr.size() > 0) wmIsLive = true;
         for (JsonObject o : arr) {
@@ -1857,9 +1816,9 @@ void wmFetchFixtures() {
         }
     }
     if (wmCount == 0) {
-        DynamicJsonDocument doc2(16384);
+        DynamicJsonDocument doc2(8192);
         String url2 = "https://v3.football.api-sports.io/fixtures?league=1&season=2026&next=8";
-        if (httpGetJson(url2, doc2, API_FOOTBALL_KEY)) {
+        if (httpGetJson(url2, doc2, API_FOOTBALL_KEY, &wmFixtureFilter())) {
             JsonArray arr = doc2["response"].as<JsonArray>();
             for (JsonObject o : arr) {
                 if (wmCount >= WM_MAX) break;
@@ -1877,11 +1836,21 @@ void wmFetchFixtures() {
         }
     }
 }
+JsonDocument& wmPredictionFilter() {
+    static DynamicJsonDocument f(256);
+    if (f.isNull()) {
+        JsonObject item = f["response"][0].to<JsonObject>();
+        item["predictions"]["percent"]["home"] = true;
+        item["predictions"]["percent"]["draw"] = true;
+        item["predictions"]["percent"]["away"] = true;
+    }
+    return f;
+}
 void wmFetchPrediction(int idx) {
     if (idx < 0 || idx >= wmCount || !wifiIsConnected()) return;
-    DynamicJsonDocument doc(8192);
+    DynamicJsonDocument doc(2048);
     String url = "https://v3.football.api-sports.io/predictions?fixture=" + String(wmFixtures[idx].id);
-    if (httpGetJson(url, doc, API_FOOTBALL_KEY)) {
+    if (httpGetJson(url, doc, API_FOOTBALL_KEY, &wmPredictionFilter())) {
         JsonArray arr = doc["response"].as<JsonArray>();
         if (arr.size() > 0) {
             JsonObject pct = arr[0]["predictions"]["percent"];
