@@ -6,6 +6,17 @@
 #include <math.h>
 #include <stdio.h>
 #include "photos.h"
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <ArduinoJson.h>
+#include <TJpg_Decoder.h>
+
+// Wird beim CI-Build per GitHub-Secret als Compiler-Flag gesetzt
+// (siehe platformio.ini / build-and-deploy.yml). Lokal ohne Secret leer.
+#ifndef API_FOOTBALL_KEY
+#define API_FOOTBALL_KEY ""
+#endif
 
 // ── Touch SPI pins (VSPI, custom CYD pins) ──────────────
 #define TOUCH_CS   33
@@ -81,8 +92,13 @@ uint16_t tintDark(uint16_t c565) {
 // ── App state ──────────────────────────────────────
 enum Screen { SCR_HOME, SCR_NOTES_LIST, SCR_NOTES_EDIT, SCR_QUIZ_SELECT, SCR_QUIZ,
               SCR_GAME_SELECT, SCR_SNAKE, SCR_FLAPPY, SCR_PICTURES,
-              SCR_CALC, SCR_STOPWATCH };
+              SCR_CALC, SCR_STOPWATCH,
+              SCR_SETTINGS, SCR_WIFI_SETUP,
+              SCR_TTT_SELECT, SCR_TTT,
+              SCR_NEWS_LIST, SCR_NEWS_DETAIL,
+              SCR_WM_LIST, SCR_WM_DETAIL };
 Screen currentScreen = SCR_HOME;
+Screen settingsReturnScreen = SCR_HOME;
 unsigned long lastTouchMs = 0;
 
 // ── Touch calibration ──────────────────────────
@@ -226,6 +242,116 @@ unsigned long swStartMs = 0;
 bool swRunning = false;
 unsigned long swLastDraw = 0;
 
+// ── WLAN ─────────────────────────────────────────
+String wifiSsid = "";
+String wifiPass = "";
+int    wifiEditField = 0;     // 0 = SSID-Feld, 1 = Passwort-Feld
+bool   wifiShift     = false;
+bool   wifiDigitMode = false;
+String wifiStatusMsg = "";
+const char* WKEY_LETTERS[3][10] = {
+  {"q","w","e","r","t","z","u","i","o","p"},
+  {"a","s","d","f","g","h","j","k","l","-"},
+  {"y","x","c","v","b","n","m",".","_","@"}
+};
+const char* WKEY_DIGITS[3][10] = {
+  {"1","2","3","4","5","6","7","8","9","0"},
+  {"!","#","$","%","&","*","(",")","+","="},
+  {"/",":",";","?","~","[","]","{","}","^"}
+};
+bool wifiIsConnected() { return WiFi.status() == WL_CONNECTED; }
+bool wifiTryConnect(unsigned long timeoutMs) {
+    if (wifiSsid.length() == 0) { wifiStatusMsg = "Keine SSID gespeichert"; return false; }
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
+    unsigned long t0 = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - t0 < timeoutMs) delay(200);
+    bool ok = (WiFi.status() == WL_CONNECTED);
+    wifiStatusMsg = ok ? "Verbunden: " + WiFi.localIP().toString() : "Verbindung fehlgeschlagen";
+    return ok;
+}
+void wifiLoadCreds() {
+    wifiSsid = prefs.getString("wssid", "");
+    wifiPass = prefs.getString("wpass", "");
+}
+void wifiSaveCreds() {
+    prefs.putString("wssid", wifiSsid);
+    prefs.putString("wpass", wifiPass);
+}
+void drawWifiIcon(int x, int y) {
+    uint16_t col = wifiIsConnected() ? COL_GOOD : COL_MUTE;
+    for (int i = 0; i < 3; i++) {
+        int r = 4 + i * 4;
+        tft.drawCircleHelper(x, y + 4, r, 1, col);
+        tft.drawCircleHelper(x, y + 4, r, 2, col);
+    }
+    tft.fillCircle(x, y + 4, 2, col);
+}
+
+// ── HTTP/JSON-Hilfsfunktion (HTTPS ohne Zertifikatspruefung -
+//    fuer einen Hobby-Geraet ausreichend, da nur oeffentliche,
+//    nicht-sensible Daten abgerufen werden) ──────────
+bool httpGetJson(const String& url, DynamicJsonDocument& doc, const char* apiKeyHeader = nullptr) {
+    if (!wifiIsConnected()) return false;
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+    http.setTimeout(8000);
+    if (!http.begin(client, url)) return false;
+    if (apiKeyHeader && apiKeyHeader[0]) http.addHeader("x-apisports-key", apiKeyHeader);
+    int code = http.GET();
+    bool ok = false;
+    if (code == 200) {
+        DeserializationError err = deserializeJson(doc, http.getStream());
+        ok = !err;
+    }
+    http.end();
+    return ok;
+}
+
+// ── Nachrichten (RSS: ARD/Tagesschau, ZDF, WDR, Zeit Online) ──
+#define NEWS_MAX 16
+#define NEWS_SOURCES 4
+struct NewsItem { String title; String desc; String imgUrl; String source; };
+NewsItem newsItems[NEWS_MAX];
+int  newsCount  = 0;
+int  newsScroll = 0;
+int  newsSel    = -1;
+bool newsLoading = false;
+const char* NEWS_SOURCE_NAMES[NEWS_SOURCES] = { "ARD", "ZDF", "WDR", "ZEIT" };
+const char* NEWS_URLS[NEWS_SOURCES] = {
+    "https://www.tagesschau.de/xml/rss2",
+    "https://www.zdf.de/rss/zdf/nachrichten",
+    "https://www.wdr.de/xml/newsticker.rdf",
+    "https://newsfeed.zeit.de/index"
+};
+
+// ── WM 2026 Liveticker + Gewinn-Wahrscheinlichkeit ──────
+#define WM_MAX 12
+struct WMFixture {
+    long   id;
+    String home, away, dateStr, statusShort;
+    int    goalsHome, goalsAway, elapsed;
+    int    predHome, predDraw, predAway;   // -1 = noch nicht geladen
+    bool   live;
+};
+WMFixture wmFixtures[WM_MAX];
+int  wmCount   = 0;
+int  wmSel     = -1;
+int  wmScroll  = 0;
+bool wmLoading = false;
+bool wmIsLive  = false;   // true = echte Live-Spiele, false = naechste Spiele
+
+// ── TicTacToe ────────────────────────────────────
+int  tttBoard[9];
+bool tttVsAI   = true;
+int  tttTurn   = 1;        // 1 = X (Spieler), 2 = O (KI oder Spieler 2)
+bool tttOver   = false;
+int  tttWinner = 0;        // 0 = unentschieden/offen, 1 oder 2
+int  tttWinLine[3] = {-1, -1, -1};
+unsigned long tttAiMoveAt = 0;
+bool tttAiPending = false;
+
 // ── Forward declarations ──────────────────────────
 void drawHomeIcon(TFT_eSPI& g, int x, int y);
 bool handleHomeTap(int x, int y);
@@ -254,6 +380,24 @@ void handleTouch(int x, int y);
 void switchScreen(Screen s);
 void redrawCurrent();
 void runCalibration();
+void drawSettings();
+void settingsHandleTouch(int x, int y);
+void drawWifiSetup();
+void wifiHandleTouch(int x, int y);
+void drawTttSelect();
+void drawTtt();
+void tttHandleTouch(int x, int y);
+void tttStartGame();
+bool tjpgOutputCb(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap);
+void newsFetchAll();
+void drawNewsList();
+void drawNewsDetail();
+void newsHandleTouch(int x, int y);
+void wmFetchFixtures();
+void wmFetchPrediction(int idx);
+void drawWmList();
+void drawWmDetail();
+void wmHandleTouch(int x, int y);
 
 // ── Notes persistence ──────────────────────────
 void loadNotes() {
@@ -314,6 +458,11 @@ void setup() {
     flBest = prefs.getInt("flbest", 0);
     randomSeed(esp_random());
     initHomeTiles();
+    wifiLoadCreds();
+
+    TJpgDec.setJpgScale(1);
+    TJpgDec.setSwapBytes(true);
+    TJpgDec.setCallback(tjpgOutputCb);
 
     touchCal = prefs.getBool("tcal", false);
     if (touchCal) {
@@ -330,10 +479,17 @@ void setup() {
     tft.drawString("CYD Mini-Apps", 66, 92);
     tft.setTextColor(COL_MUTE);
     tft.setTextSize(1);
-    tft.drawString("Offline  -  ohne WLAN", 92, 120);
+    tft.drawString("Spiele, Quiz, Notizen, News, WM ...", 56, 120);
     delay(900);
 
     if (!touchCal) runCalibration();
+
+    if (wifiSsid.length() > 0) {
+        tft.fillScreen(COL_BG);
+        tft.setTextSize(1); tft.setTextColor(COL_MUTE);
+        tft.drawString("Verbinde mit WLAN...", 110, 116);
+        wifiTryConnect(6000);
+    }
 
     switchScreen(SCR_HOME);
 }
@@ -354,6 +510,17 @@ void loop() {
         millis() - swLastDraw > 60UL) {
         swLastDraw = millis();
         drawStopwatchTime();
+    }
+    if (currentScreen == SCR_TTT && tttAiPending && millis() >= tttAiMoveAt) {
+        tttAiPending = false;
+        int mv = tttBestMove();
+        if (mv >= 0) {
+            tttBoard[mv] = 2;
+            tttDrawCell(mv);
+            tttFinishCheck();
+            if (!tttOver) tttTurn = 1;
+            drawTttStatus();
+        }
     }
     if (touch.tirqTouched() && touch.touched()) {
         TS_Point p = touch.getPoint();
@@ -455,6 +622,14 @@ void redrawCurrent() {
     else if (currentScreen == SCR_PICTURES)     drawPictures();
     else if (currentScreen == SCR_CALC)         drawCalcScreen();
     else if (currentScreen == SCR_STOPWATCH)    drawStopwatchScreen();
+    else if (currentScreen == SCR_SETTINGS)     drawSettings();
+    else if (currentScreen == SCR_WIFI_SETUP)   drawWifiSetup();
+    else if (currentScreen == SCR_TTT_SELECT)   drawTttSelect();
+    else if (currentScreen == SCR_TTT)          drawTtt();
+    else if (currentScreen == SCR_NEWS_LIST)    drawNewsList();
+    else if (currentScreen == SCR_NEWS_DETAIL)  drawNewsDetail();
+    else if (currentScreen == SCR_WM_LIST)      drawWmList();
+    else if (currentScreen == SCR_WM_DETAIL)    drawWmDetail();
     else if (currentScreen == SCR_SNAKE) { if (snLen == 0) initSnake(); else drawSnakeFull(); }
     else if (currentScreen == SCR_FLAPPY) {
         drawFlappyHeader();
@@ -513,19 +688,44 @@ void iconStopwatch(int cx, int cy) {
     tft.drawLine(cx, cy + 2, cx + 6, cy + 4, COL_TEXT);
     tft.fillRect(cx - 3, cy - 16, 6, 4, COL_TEXT);
 }
+void iconNews(int cx, int cy) {
+    tft.fillRoundRect(cx - 16, cy - 14, 32, 28, 4, COL_DARK);
+    tft.fillRect(cx - 11, cy - 9, 12, 9, COL_TEXT);
+    tft.drawFastHLine(cx - 11, cy + 3, 22, COL_TEXT);
+    tft.drawFastHLine(cx - 11, cy + 8, 22, COL_TEXT);
+}
+void iconWM(int cx, int cy) {
+    tft.fillCircle(cx, cy, 14, COL_DARK);
+    tft.fillTriangle(cx, cy - 8, cx - 7, cy - 2, cx + 7, cy - 2, COL_TEXT);
+    tft.fillTriangle(cx, cy + 8, cx - 7, cy + 2, cx + 7, cy + 2, COL_TEXT);
+    tft.drawCircle(cx, cy, 14, COL_TEXT);
+}
+void iconTTT(int cx, int cy) {
+    tft.drawFastVLine(cx - 6, cy - 14, 28, COL_TEXT);
+    tft.drawFastVLine(cx + 6, cy - 14, 28, COL_TEXT);
+    tft.drawFastHLine(cx - 14, cy - 6, 28, COL_TEXT);
+    tft.drawFastHLine(cx - 14, cy + 6, 28, COL_TEXT);
+    tft.drawLine(cx - 11, cy - 11, cx - 3, cy - 3, COL_ACCENT);
+    tft.drawLine(cx - 3, cy - 11, cx - 11, cy - 3, COL_ACCENT);
+    tft.drawCircle(cx + 9, cy + 0, 5, COL_ACCENT2);
+}
 
-// ══ HOME ═════════════════════════════════════════
+// ══ HOME (3x3 Raster) ═════════════════════════════
 struct HomeTile { int x, y, w, h; uint16_t col; const char* label; int icon; Screen target; };
-HomeTile homeTiles[6];
+#define HOME_TILE_COUNT 9
+HomeTile homeTiles[HOME_TILE_COUNT];
 void initHomeTiles() {
-    int x0 = 4, x1 = 108, x2 = 212, w = 104, h = 95;
-    int y0 = 34, y1 = 135;
+    int x0 = 4, x1 = 108, x2 = 212, w = 104, h = 64;
+    int y0 = 32, y1 = 99, y2 = 166;
     homeTiles[0] = {x0, y0, w, h, tft.color565(41, 98, 255),  "Spiele",  0, SCR_GAME_SELECT};
     homeTiles[1] = {x1, y0, w, h, tft.color565(156, 39, 176), "Quiz",    1, SCR_QUIZ_SELECT};
     homeTiles[2] = {x2, y0, w, h, tft.color565(0, 150, 136),  "Notizen", 2, SCR_NOTES_LIST};
     homeTiles[3] = {x0, y1, w, h, tft.color565(233, 30, 99),  "Bilder",  3, SCR_PICTURES};
     homeTiles[4] = {x1, y1, w, h, tft.color565(255, 152, 0),  "Rechner", 4, SCR_CALC};
     homeTiles[5] = {x2, y1, w, h, tft.color565(0, 191, 165),  "Stoppuhr",5, SCR_STOPWATCH};
+    homeTiles[6] = {x0, y2, w, h, tft.color565(255, 87, 34),  "News",    6, SCR_NEWS_LIST};
+    homeTiles[7] = {x1, y2, w, h, tft.color565(56, 142, 60),  "WM 2026", 7, SCR_WM_LIST};
+    homeTiles[8] = {x2, y2, w, h, tft.color565(94, 53, 177),  "TicTacToe",8, SCR_TTT_SELECT};
 }
 void drawHomeScreen() {
     tft.fillScreen(COL_BG);
@@ -533,19 +733,22 @@ void drawHomeScreen() {
     tft.drawString("CYD Mini-Apps", 84, 6);
     drawGear(305, 15);
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < HOME_TILE_COUNT; i++) {
         HomeTile& t = homeTiles[i];
-        tft.fillRoundRect(t.x, t.y, t.w, t.h, 12, t.col);
-        int cx = t.x + t.w / 2, cy = t.y + 30;
+        tft.fillRoundRect(t.x, t.y, t.w, t.h, 10, t.col);
+        int cx = t.x + t.w / 2, cy = t.y + 20;
         if      (t.icon == 0) iconGamepad(cx, cy);
         else if (t.icon == 1) iconQuiz(cx, cy);
         else if (t.icon == 2) iconNotes(cx, cy);
         else if (t.icon == 3) iconPic(cx, cy);
         else if (t.icon == 4) iconCalc(cx, cy);
-        else                  iconStopwatch(cx, cy);
+        else if (t.icon == 5) iconStopwatch(cx, cy);
+        else if (t.icon == 6) iconNews(cx, cy);
+        else if (t.icon == 7) iconWM(cx, cy);
+        else                  iconTTT(cx, cy);
         tft.setTextSize(1); tft.setTextColor(COL_TEXT, t.col);
         int tw = strlen(t.label) * 6;
-        tft.drawString(t.label, t.x + (t.w - tw) / 2, t.y + t.h - 18);
+        tft.drawString(t.label, t.x + (t.w - tw) / 2, t.y + t.h - 13);
     }
 }
 
@@ -1134,12 +1337,717 @@ void stopwatchHandleTouch(int x, int y) {
     }
 }
 
+// ══ EINSTELLUNGEN (hinter dem Zahnrad-Symbol) ════════════
+void drawSettings() {
+    tft.fillScreen(COL_DARKER);
+    drawHomeIcon(tft, 2, 3);
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT);
+    tft.drawString("Einstellungen", 90, 4);
+
+    tft.fillRoundRect(30, 50, 260, 56, 10, COL_CARD);
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT, COL_CARD);
+    tft.drawString("Touch kalibrieren", 56, 68);
+
+    tft.fillRoundRect(30, 118, 260, 56, 10, COL_ACCENT2);
+    tft.setTextSize(2); tft.setTextColor(COL_DARK, COL_ACCENT2);
+    tft.drawString("WLAN einrichten", 60, 136);
+
+    drawWifiIcon(290, 184);
+    tft.setTextSize(1); tft.setTextColor(wifiIsConnected() ? COL_GOOD : COL_MUTE);
+    tft.drawString(wifiIsConnected() ? "WLAN verbunden" : "Kein WLAN", 70, 192);
+}
+void settingsHandleTouch(int x, int y) {
+    if (handleHomeTap(x, y)) return;
+    if (y >= 50 && y <= 106 && x >= 30 && x <= 290) { runCalibration(); switchScreen(SCR_HOME); return; }
+    if (y >= 118 && y <= 174 && x >= 30 && x <= 290) { switchScreen(SCR_WIFI_SETUP); return; }
+}
+
+// ══ WLAN EINRICHTEN (eigene Tastatur mit Buchstaben/Ziffern) ══
+void drawWifiKeyboard(TFT_eSPI& g) {
+    const char* (*rows)[10] = wifiDigitMode ? WKEY_DIGITS : WKEY_LETTERS;
+    for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 10; c++) {
+            int kx = c * KEY_W, ky = KBD_Y + r * KEY_H;
+            bool isDel = (r == 1 && c == 9);
+            uint16_t col = isDel ? COL_BAD : COL_KEY;
+            g.fillRoundRect(kx + 1, ky + 1, KEY_W - 2, KEY_H - 2, 4, col);
+            g.setTextColor(COL_TEXT, col); g.setTextSize(1);
+            if (isDel) { g.drawString("DEL", kx + 5, ky + 12); continue; }
+            String lbl = rows[r][c];
+            if (!wifiDigitMode && wifiShift) lbl.toUpperCase();
+            g.drawString(lbl, kx + 11, ky + 12);
+        }
+    }
+    int ky3 = KBD_Y + KEY_H * 3;
+    g.fillRoundRect(1, ky3 + 1, 62, KEY_H - 2, 4, wifiDigitMode ? COL_ACCENT2 : COL_KEYSP);
+    g.setTextColor(COL_TEXT, wifiDigitMode ? COL_ACCENT2 : COL_KEYSP); g.setTextSize(1);
+    g.drawString(wifiDigitMode ? "ABC" : "123", 14, ky3 + 12);
+
+    g.fillRoundRect(65, ky3 + 1, 62, KEY_H - 2, 4, wifiShift ? COL_ACCENT2 : COL_KEYSP);
+    g.setTextColor(COL_TEXT, wifiShift ? COL_ACCENT2 : COL_KEYSP);
+    g.drawString("SHIFT", 72, ky3 + 12);
+
+    g.fillRoundRect(129, ky3 + 1, 126, KEY_H - 2, 4, COL_KEYSP);
+    g.setTextColor(COL_TEXT, COL_KEYSP);
+    g.drawString("LEERTASTE", 150, ky3 + 12);
+
+    g.fillRoundRect(257, ky3 + 1, 62, KEY_H - 2, 4, COL_GOOD);
+    g.setTextColor(COL_DARK, COL_GOOD);
+    g.drawString("OK", 275, ky3 + 12);
+}
+void drawWifiSetup() {
+    TFT_eSPI& g = sprOK ? (TFT_eSPI&)spr : tft;
+    g.fillScreen(COL_BG);
+    drawHomeIcon(g, 2, 3);
+    g.fillRoundRect(32, 3, 110, 24, 8, COL_GOOD);
+    g.setTextSize(1); g.setTextColor(COL_DARK, COL_GOOD);
+    g.drawString("Verbinden", 50, 11);
+
+    g.fillRoundRect(8, 30, 152, 26, 6, wifiEditField == 0 ? COL_ACCENT2 : COL_CARD2);
+    g.setTextColor(COL_TEXT, wifiEditField == 0 ? COL_ACCENT2 : COL_CARD2); g.setTextSize(1);
+    String ssidShown = wifiSsid.length() ? wifiSsid : "(SSID eingeben)";
+    g.drawString("SSID: " + ssidShown, 14, 40);
+
+    g.fillRoundRect(166, 30, 146, 26, 6, wifiEditField == 1 ? COL_ACCENT2 : COL_CARD2);
+    g.setTextColor(COL_TEXT, wifiEditField == 1 ? COL_ACCENT2 : COL_CARD2);
+    String passMasked = "";
+    for (unsigned int i = 0; i < wifiPass.length(); i++) passMasked += "*";
+    g.drawString("Pass: " + (wifiPass.length() ? passMasked : String("(optional)")), 172, 40);
+
+    g.setTextColor(COL_MUTE, COL_BG);
+    g.drawString(wifiStatusMsg, 8, 60);
+
+    drawWifiKeyboard(g);
+    if (sprOK) spr.pushSprite(0, 0);
+}
+void wifiKeyTap(const String& ch) {
+    String& field = (wifiEditField == 0) ? wifiSsid : wifiPass;
+    if (field.length() < 32) field += ch;
+}
+void wifiHandleTouch(int x, int y) {
+    if (y < TAB_H) {
+        if (x < 32) { switchScreen(SCR_SETTINGS); return; }
+        if (x < 142) {
+            wifiSaveCreds();
+            wifiStatusMsg = "Verbinde...";
+            drawWifiSetup();
+            bool ok = wifiTryConnect(10000);
+            drawWifiSetup();
+            if (ok) { delay(600); switchScreen(SCR_SETTINGS); }
+            return;
+        }
+        return;
+    }
+    if (y >= 30 && y <= 56) {
+        if (x < 160) wifiEditField = 0; else wifiEditField = 1;
+        drawWifiSetup();
+        return;
+    }
+    if (y < KBD_Y) return;
+    int row = (y - KBD_Y) / KEY_H;
+    if (row < 0 || row > 3) return;
+    if (row < 3) {
+        int col = constrain(x / KEY_W, 0, 9);
+        if (row == 1 && col == 9) {
+            String& field = (wifiEditField == 0) ? wifiSsid : wifiPass;
+            if (field.length() > 0) field.remove(field.length() - 1);
+            drawWifiSetup();
+            return;
+        }
+        const char* (*rows)[10] = wifiDigitMode ? WKEY_DIGITS : WKEY_LETTERS;
+        String lbl = rows[row][col];
+        if (!wifiDigitMode && wifiShift) lbl.toUpperCase();
+        wifiKeyTap(lbl);
+        drawWifiSetup();
+        return;
+    }
+    // row 3: mode toggle / shift / space / OK
+    if (x < 64) { wifiDigitMode = !wifiDigitMode; drawWifiSetup(); return; }
+    if (x < 128) { wifiShift = !wifiShift; drawWifiSetup(); return; }
+    if (x < 256) { wifiKeyTap(" "); drawWifiSetup(); return; }
+    wifiSaveCreds();
+    wifiStatusMsg = "Verbinde...";
+    drawWifiSetup();
+    bool ok = wifiTryConnect(10000);
+    drawWifiSetup();
+    if (ok) { delay(600); switchScreen(SCR_SETTINGS); }
+}
+
+// ══ TICTACTOE ═════════════════════════════════════
+#define TTT_X0 70
+#define TTT_Y0 40
+#define TTT_CELL 60
+int tttCheckWinnerLine(int* b, int* line) {
+    const int lines[8][3] = {{0,1,2},{3,4,5},{6,7,8},{0,3,6},{1,4,7},{2,5,8},{0,4,8},{2,4,6}};
+    for (int i = 0; i < 8; i++) {
+        const int* l = lines[i];
+        if (b[l[0]] && b[l[0]] == b[l[1]] && b[l[1]] == b[l[2]]) {
+            if (line) { line[0] = l[0]; line[1] = l[1]; line[2] = l[2]; }
+            return b[l[0]];
+        }
+    }
+    return 0;
+}
+bool tttBoardFull(int* b) {
+    for (int i = 0; i < 9; i++) if (!b[i]) return false;
+    return true;
+}
+int tttMinimax(int* b, int depth, bool maximizing) {
+    int w = tttCheckWinnerLine(b, nullptr);
+    if (w == 2) return 10 - depth;
+    if (w == 1) return depth - 10;
+    if (tttBoardFull(b)) return 0;
+    if (maximizing) {
+        int best = -999;
+        for (int i = 0; i < 9; i++) if (!b[i]) {
+            b[i] = 2; int v = tttMinimax(b, depth + 1, false); b[i] = 0;
+            if (v > best) best = v;
+        }
+        return best;
+    } else {
+        int best = 999;
+        for (int i = 0; i < 9; i++) if (!b[i]) {
+            b[i] = 1; int v = tttMinimax(b, depth + 1, true); b[i] = 0;
+            if (v < best) best = v;
+        }
+        return best;
+    }
+}
+int tttBestMove() {
+    int bestVal = -999, bestMove = -1;
+    for (int i = 0; i < 9; i++) if (tttBoard[i] == 0) {
+        tttBoard[i] = 2;
+        int v = tttMinimax(tttBoard, 0, false);
+        tttBoard[i] = 0;
+        if (v > bestVal) { bestVal = v; bestMove = i; }
+    }
+    return bestMove;
+}
+void tttStartGame() {
+    for (int i = 0; i < 9; i++) tttBoard[i] = 0;
+    tttTurn = 1; tttOver = false; tttWinner = 0;
+    tttWinLine[0] = tttWinLine[1] = tttWinLine[2] = -1;
+    tttAiPending = false;
+}
+void drawTttSelect() {
+    tft.fillScreen(COL_BG);
+    drawHomeIcon(tft, 2, 3);
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT);
+    tft.drawString("TicTacToe", 100, 6);
+
+    tft.fillRoundRect(16, 50, 138, 150, 14, tft.color565(33, 110, 200));
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT, tft.color565(33, 110, 200));
+    tft.drawString("Gegen", 60, 105);
+    tft.drawString("die KI", 58, 130);
+
+    tft.fillRoundRect(166, 50, 138, 150, 14, tft.color565(156, 39, 176));
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT, tft.color565(156, 39, 176));
+    tft.drawString("2 Spieler", 184, 105);
+    tft.drawString("lokal", 210, 130);
+}
+void tttDrawCell(int i) {
+    int col = i % 3, row = i / 3;
+    int cx = TTT_X0 + col * TTT_CELL, cy = TTT_Y0 + row * TTT_CELL;
+    bool winning = (i == tttWinLine[0] || i == tttWinLine[1] || i == tttWinLine[2]);
+    tft.fillRoundRect(cx + 3, cy + 3, TTT_CELL - 6, TTT_CELL - 6, 8,
+                       winning ? COL_GOOD : COL_CARD);
+    if (tttBoard[i] == 1) {
+        uint16_t c = winning ? COL_DARK : COL_ACCENT;
+        tft.drawLine(cx + 14, cy + 14, cx + TTT_CELL - 14, cy + TTT_CELL - 14, c);
+        tft.drawLine(cx + 15, cy + 14, cx + TTT_CELL - 13, cy + TTT_CELL - 14, c);
+        tft.drawLine(cx + TTT_CELL - 14, cy + 14, cx + 14, cy + TTT_CELL - 14, c);
+        tft.drawLine(cx + TTT_CELL - 13, cy + 14, cx + 15, cy + TTT_CELL - 14, c);
+    } else if (tttBoard[i] == 2) {
+        uint16_t c = winning ? COL_DARK : COL_ACCENT2;
+        tft.drawCircle(cx + TTT_CELL / 2, cy + TTT_CELL / 2, 16, c);
+        tft.drawCircle(cx + TTT_CELL / 2 - 1, cy + TTT_CELL / 2, 16, c);
+    }
+}
+void drawTttStatus() {
+    tft.fillRect(0, 0, SCR_W, TAB_H, COL_BG);
+    drawHomeIcon(tft, 2, 3);
+    tft.setTextSize(1); tft.setTextColor(COL_TEXT);
+    String msg;
+    if (tttOver) {
+        if (tttWinner == 0) msg = "Unentschieden!";
+        else if (tttVsAI) msg = (tttWinner == 1) ? "Du gewinnst!" : "KI gewinnt!";
+        else msg = (tttWinner == 1) ? "Spieler 1 gewinnt!" : "Spieler 2 gewinnt!";
+        msg += "  (antippen = neu)";
+    } else if (tttVsAI) {
+        msg = (tttTurn == 1) ? "Du bist dran (X)" : "KI denkt...";
+    } else {
+        msg = (tttTurn == 1) ? "Spieler 1 (X) ist dran" : "Spieler 2 (O) ist dran";
+    }
+    tft.fillRoundRect(32, 3, SCR_W - 38, 24, 8, COL_CARD);
+    tft.setTextColor(COL_TEXT, COL_CARD);
+    tft.drawString(msg, 40, 11);
+}
+void drawTtt() {
+    tft.fillScreen(COL_BG);
+    drawTttStatus();
+    for (int i = 0; i < 9; i++) tttDrawCell(i);
+}
+void tttFinishCheck() {
+    int line[3];
+    int w = tttCheckWinnerLine(tttBoard, line);
+    if (w) {
+        tttOver = true; tttWinner = w;
+        tttWinLine[0] = line[0]; tttWinLine[1] = line[1]; tttWinLine[2] = line[2];
+    } else if (tttBoardFull(tttBoard)) {
+        tttOver = true; tttWinner = 0;
+    }
+}
+void tttHandleTouch(int x, int y) {
+    if (handleHomeTap(x, y)) return;
+    if (tttOver) { tttStartGame(); drawTtt(); return; }
+    if (tttVsAI && tttTurn == 2) return;   // KI ist dran, Touch ignorieren
+    if (y < TTT_Y0 || y >= TTT_Y0 + TTT_CELL * 3 || x < TTT_X0 || x >= TTT_X0 + TTT_CELL * 3) return;
+    int col = (x - TTT_X0) / TTT_CELL, row = (y - TTT_Y0) / TTT_CELL;
+    int idx = row * 3 + col;
+    if (tttBoard[idx] != 0) return;
+    tttBoard[idx] = tttTurn;
+    tttDrawCell(idx);
+    tttFinishCheck();
+    if (!tttOver) {
+        tttTurn = (tttTurn == 1) ? 2 : 1;
+        if (tttVsAI && tttTurn == 2) {
+            tttAiPending = true;
+            tttAiMoveAt = millis() + 450;
+        }
+    }
+    drawTttStatus();
+}
+
+// ══ NACHRICHTEN (RSS: ARD/Tagesschau, ZDF, WDR, Zeit Online) ══
+String xmlTagContent(const String& s, const String& tag) {
+    String openTag = "<" + tag;
+    int start = s.indexOf(openTag);
+    if (start < 0) return "";
+    int tagEnd = s.indexOf('>', start);
+    if (tagEnd < 0) return "";
+    String closeTag = "</" + tag + ">";
+    int closeStart = s.indexOf(closeTag, tagEnd);
+    if (closeStart < 0) return "";
+    return s.substring(tagEnd + 1, closeStart);
+}
+String xmlAttr(const String& s, const String& tagStart, const String& attr) {
+    int p = s.indexOf(tagStart);
+    if (p < 0) return "";
+    int tagClose = s.indexOf('>', p);
+    if (tagClose < 0) tagClose = s.length();
+    int attrPos = s.indexOf(attr + "=\"", p);
+    if (attrPos < 0 || attrPos > tagClose) return "";
+    int vs = attrPos + attr.length() + 2;
+    int ve = s.indexOf('"', vs);
+    if (ve < 0) return "";
+    return s.substring(vs, ve);
+}
+String xmlClean(String s) {
+    s.trim();
+    if (s.startsWith("<![CDATA[")) {
+        int end = s.indexOf("]]>");
+        s = (end >= 0) ? s.substring(9, end) : s.substring(9);
+    }
+    s.replace("&amp;", "&"); s.replace("&quot;", "\""); s.replace("&#039;", "'");
+    s.replace("&apos;", "'"); s.replace("&lt;", "<"); s.replace("&gt;", ">");
+    s.trim();
+    return s;
+}
+void newsFetchAll() {
+    newsCount = 0; newsScroll = 0;
+    if (!wifiIsConnected()) return;
+    for (int s = 0; s < NEWS_SOURCES && newsCount < NEWS_MAX; s++) {
+        WiFiClientSecure client; client.setInsecure();
+        HTTPClient http;
+        http.setTimeout(8000);
+        if (!http.begin(client, NEWS_URLS[s])) continue;
+        int code = http.GET();
+        if (code == 200) {
+            int contentLen = http.getSize();
+            if (contentLen > 150000) { http.end(); continue; }
+            String body = http.getString();
+            int pos = 0, perSource = 0;
+            while (perSource < 4 && newsCount < NEWS_MAX) {
+                int itemStart = body.indexOf("<item", pos);
+                if (itemStart < 0) break;
+                int itemEnd = body.indexOf("</item>", itemStart);
+                if (itemEnd < 0) break;
+                String itemXml = body.substring(itemStart, itemEnd);
+                pos = itemEnd + 7;
+                String title = xmlClean(xmlTagContent(itemXml, "title"));
+                if (title.length() == 0) continue;
+                String desc = xmlClean(xmlTagContent(itemXml, "description"));
+                String img = xmlAttr(itemXml, "<enclosure", "url");
+                if (img.length() == 0) img = xmlAttr(itemXml, "<media:thumbnail", "url");
+                if (img.length() == 0) img = xmlAttr(itemXml, "<media:content", "url");
+                newsItems[newsCount].title  = title.length() > 110 ? title.substring(0, 110) : title;
+                newsItems[newsCount].desc   = desc.length() > 280 ? desc.substring(0, 280) : desc;
+                newsItems[newsCount].imgUrl = img;
+                newsItems[newsCount].source = NEWS_SOURCE_NAMES[s];
+                newsCount++; perSource++;
+            }
+        }
+        http.end();
+    }
+}
+#define NEWS_LIST_TOP 36
+#define NEWS_ITEM_H   38
+#define NEWS_VIS      5
+void drawNewsList() {
+    tft.fillScreen(COL_BG);
+    drawHomeIcon(tft, 2, 3);
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT);
+    tft.drawString("Nachrichten", 90, 4);
+
+    if (!wifiIsConnected()) {
+        tft.setTextSize(1); tft.setTextColor(COL_BAD);
+        tft.drawString("Kein WLAN verbunden.", 18, 80);
+        tft.setTextColor(COL_MUTE);
+        tft.drawString("Einstellungen -> WLAN einrichten", 18, 98);
+        return;
+    }
+    if (newsLoading) {
+        tft.setTextSize(1); tft.setTextColor(COL_ACCENT);
+        tft.drawString("Lade Nachrichten...", 18, 90);
+        return;
+    }
+    if (newsCount == 0) {
+        tft.setTextSize(1); tft.setTextColor(COL_MUTE);
+        tft.drawString("Keine Nachrichten geladen.", 18, 80);
+        tft.fillRoundRect(18, 100, 140, 30, 8, COL_ACCENT);
+        tft.setTextColor(COL_DARK, COL_ACCENT);
+        tft.drawString("Neu laden", 48, 108);
+        return;
+    }
+    int maxScroll = newsCount > NEWS_VIS ? newsCount - NEWS_VIS : 0;
+    if (newsScroll > maxScroll) newsScroll = maxScroll;
+    if (newsScroll < 0) newsScroll = 0;
+    bool scrollable = newsCount > NEWS_VIS;
+    int itemW = scrollable ? SCR_W - 34 : SCR_W - 12;
+    for (int v = 0; v < NEWS_VIS; v++) {
+        int idx = newsScroll + v;
+        if (idx >= newsCount) break;
+        int y = NEWS_LIST_TOP + v * NEWS_ITEM_H;
+        tft.fillRoundRect(6, y, itemW, NEWS_ITEM_H - 5, 6, COL_CARD);
+        tft.fillRoundRect(6, y, 5, NEWS_ITEM_H - 5, 2, COL_ACCENT);
+        tft.setTextSize(1); tft.setTextColor(COL_ACCENT, COL_CARD);
+        tft.drawString(newsItems[idx].source, 14, y + 4);
+        tft.setTextColor(COL_TEXT, COL_CARD);
+        String t = newsItems[idx].title;
+        if (t.length() > 44) t = t.substring(0, 44) + "...";
+        tft.drawString(t, 14, y + 17);
+    }
+    if (scrollable) {
+        int ax = SCR_W - 26;
+        tft.fillRoundRect(ax, NEWS_LIST_TOP, 22, 78, 6, COL_CARD);
+        tft.fillTriangle(ax + 11, NEWS_LIST_TOP + 8, ax + 4, NEWS_LIST_TOP + 24, ax + 18, NEWS_LIST_TOP + 24, COL_ACCENT);
+        int by = NEWS_LIST_TOP + 86;
+        tft.fillRoundRect(ax, by, 22, 78, 6, COL_CARD);
+        tft.fillTriangle(ax + 11, by + 70, ax + 4, by + 54, ax + 18, by + 54, COL_ACCENT);
+    }
+}
+// Direkter Empfang+Dekodierung eines JPEG-Thumbnails (nur fuer die
+// Detailansicht, nicht fuer die Liste, um Speicher/Bandbreite zu sparen).
+bool newsThumbReady = false;
+bool tjpgOutputCb(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) {
+    tft.pushImage(x, y, w, h, bitmap);
+    return true;
+}
+void newsDrawThumb(const String& url, int x, int y, int boxW, int boxH) {
+    tft.fillRoundRect(x, y, boxW, boxH, 8, COL_CARD2);
+    if (url.length() == 0 || !wifiIsConnected()) return;
+    WiFiClientSecure client; client.setInsecure();
+    HTTPClient http;
+    http.setTimeout(8000);
+    if (!http.begin(client, url)) return;
+    int code = http.GET();
+    if (code == 200) {
+        int len = http.getSize();
+        if (len > 0 && len < 60000) {
+            uint8_t* buf = (uint8_t*)malloc(len);
+            if (buf) {
+                WiFiClient* stream = http.getStreamPtr();
+                int got = stream->readBytes(buf, len);
+                if (got == len) {
+                    uint16_t jw, jh;
+                    TJpgDec.getJpgSize(&jw, &jh, buf, len);
+                    uint8_t scale = 1;
+                    while ((jw / scale) > boxW || (jh / scale) > boxH) scale *= 2;
+                    if (scale > 8) scale = 8;
+                    TJpgDec.setJpgScale(scale);
+                    TJpgDec.setCallback(tjpgOutputCb);
+                    int dx = x + (boxW - (int)(jw / scale)) / 2;
+                    int dy = y + (boxH - (int)(jh / scale)) / 2;
+                    TJpgDec.drawJpg(dx, dy, buf, len);
+                }
+                free(buf);
+            }
+        }
+    }
+    http.end();
+}
+void drawNewsDetail() {
+    if (newsSel < 0 || newsSel >= newsCount) { switchScreen(SCR_NEWS_LIST); return; }
+    NewsItem& it = newsItems[newsSel];
+    tft.fillScreen(COL_BG);
+    drawHomeIcon(tft, 2, 3);
+    tft.fillRoundRect(32, 3, 90, 24, 8, COL_CARD2);
+    tft.setTextSize(1); tft.setTextColor(COL_TEXT, COL_CARD2);
+    tft.drawString("Zur Liste", 48, 11);
+    tft.setTextColor(COL_ACCENT, COL_BG);
+    tft.drawString(it.source, 230, 11);
+
+    newsDrawThumb(it.imgUrl, 8, 32, 80, 80);
+
+    tft.setTextColor(COL_TEXT, COL_BG); tft.setTextSize(1);
+    drawWrapped(it.title, 96, 34, 35, 12);
+
+    tft.setTextColor(COL_MUTE, COL_BG);
+    drawWrapped(it.desc, 8, 118, 52, 12);
+}
+void newsHandleTouch(int x, int y) {
+    if (handleHomeTap(x, y)) return;
+    if (currentScreen == SCR_NEWS_LIST) {
+        if (!wifiIsConnected()) return;
+        if (newsCount == 0 && !newsLoading) {
+            newsLoading = true; drawNewsList();
+            newsFetchAll();
+            newsLoading = false; drawNewsList();
+            return;
+        }
+        bool scrollable = newsCount > NEWS_VIS;
+        if (scrollable && x >= SCR_W - 28) {
+            if (y < NEWS_LIST_TOP + 82) newsScroll--; else newsScroll++;
+            drawNewsList(); return;
+        }
+        if (y >= NEWS_LIST_TOP) {
+            int v = (y - NEWS_LIST_TOP) / NEWS_ITEM_H, idx = newsScroll + v;
+            if (v < NEWS_VIS && idx < newsCount) { newsSel = idx; switchScreen(SCR_NEWS_DETAIL); }
+        }
+        return;
+    }
+    if (currentScreen == SCR_NEWS_DETAIL) {
+        if (y < TAB_H && x >= 32 && x < 122) { switchScreen(SCR_NEWS_LIST); return; }
+        return;
+    }
+}
+
+// ══ WM 2026 (Liveticker + Gewinn-Wahrscheinlichkeit, eine App) ══
+void wmFetchFixtures() {
+    wmCount = 0; wmSel = -1;
+    if (!wifiIsConnected()) return;
+    DynamicJsonDocument doc(16384);
+    String url = "https://v3.football.api-sports.io/fixtures?league=1&season=2026&live=all";
+    wmIsLive = false;
+    if (httpGetJson(url, doc, API_FOOTBALL_KEY)) {
+        JsonArray arr = doc["response"].as<JsonArray>();
+        if (arr.size() > 0) wmIsLive = true;
+        for (JsonObject o : arr) {
+            if (wmCount >= WM_MAX) break;
+            WMFixture& f = wmFixtures[wmCount];
+            f.id          = o["fixture"]["id"] | 0L;
+            f.home        = String((const char*)(o["teams"]["home"]["name"] | "?"));
+            f.away        = String((const char*)(o["teams"]["away"]["name"] | "?"));
+            f.goalsHome   = o["goals"]["home"] | 0;
+            f.goalsAway   = o["goals"]["away"] | 0;
+            f.elapsed     = o["fixture"]["status"]["elapsed"] | 0;
+            f.statusShort = String((const char*)(o["fixture"]["status"]["short"] | "?"));
+            f.dateStr     = String((const char*)(o["fixture"]["date"] | ""));
+            f.predHome = f.predDraw = f.predAway = -1;
+            f.live = true;
+            wmCount++;
+        }
+    }
+    if (wmCount == 0) {
+        DynamicJsonDocument doc2(16384);
+        String url2 = "https://v3.football.api-sports.io/fixtures?league=1&season=2026&next=8";
+        if (httpGetJson(url2, doc2, API_FOOTBALL_KEY)) {
+            JsonArray arr = doc2["response"].as<JsonArray>();
+            for (JsonObject o : arr) {
+                if (wmCount >= WM_MAX) break;
+                WMFixture& f = wmFixtures[wmCount];
+                f.id          = o["fixture"]["id"] | 0L;
+                f.home        = String((const char*)(o["teams"]["home"]["name"] | "?"));
+                f.away        = String((const char*)(o["teams"]["away"]["name"] | "?"));
+                f.goalsHome   = 0; f.goalsAway = 0; f.elapsed = 0;
+                f.statusShort = String((const char*)(o["fixture"]["status"]["short"] | "NS"));
+                f.dateStr     = String((const char*)(o["fixture"]["date"] | ""));
+                f.predHome = f.predDraw = f.predAway = -1;
+                f.live = false;
+                wmCount++;
+            }
+        }
+    }
+}
+void wmFetchPrediction(int idx) {
+    if (idx < 0 || idx >= wmCount || !wifiIsConnected()) return;
+    DynamicJsonDocument doc(8192);
+    String url = "https://v3.football.api-sports.io/predictions?fixture=" + String(wmFixtures[idx].id);
+    if (httpGetJson(url, doc, API_FOOTBALL_KEY)) {
+        JsonArray arr = doc["response"].as<JsonArray>();
+        if (arr.size() > 0) {
+            JsonObject pct = arr[0]["predictions"]["percent"];
+            String h = String((const char*)(pct["home"] | "0%"));
+            String d = String((const char*)(pct["draw"] | "0%"));
+            String a = String((const char*)(pct["away"] | "0%"));
+            wmFixtures[idx].predHome = h.toInt();
+            wmFixtures[idx].predDraw = d.toInt();
+            wmFixtures[idx].predAway = a.toInt();
+        }
+    }
+}
+String wmShortDate(const String& iso) {
+    if (iso.length() < 16) return iso;
+    return iso.substring(8, 10) + "." + iso.substring(5, 7) + " " + iso.substring(11, 16);
+}
+#define WM_LIST_TOP 36
+#define WM_ITEM_H   42
+#define WM_VIS      4
+void drawWmList() {
+    tft.fillScreen(COL_BG);
+    drawHomeIcon(tft, 2, 3);
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT);
+    tft.drawString("WM 2026", 100, 4);
+
+    if (!wifiIsConnected()) {
+        tft.setTextSize(1); tft.setTextColor(COL_BAD);
+        tft.drawString("Kein WLAN verbunden.", 18, 80);
+        tft.setTextColor(COL_MUTE);
+        tft.drawString("Einstellungen -> WLAN einrichten", 18, 98);
+        return;
+    }
+    if (wmLoading) {
+        tft.setTextSize(1); tft.setTextColor(COL_ACCENT);
+        tft.drawString("Lade Spiele...", 18, 90);
+        return;
+    }
+    if (wmCount == 0) {
+        tft.setTextSize(1); tft.setTextColor(COL_MUTE);
+        tft.drawString("Keine Spiele gefunden.", 18, 76);
+        tft.setTextColor(COL_MUTE);
+        tft.drawString("(API-Key fehlt evtl. oder Limit erreicht)", 18, 92);
+        tft.fillRoundRect(18, 110, 140, 30, 8, COL_ACCENT);
+        tft.setTextColor(COL_DARK, COL_ACCENT);
+        tft.drawString("Neu laden", 48, 118);
+        return;
+    }
+    tft.setTextSize(1); tft.setTextColor(COL_MUTE);
+    tft.drawString(wmIsLive ? "Live-Spiele" : "Naechste Spiele", 200, 8);
+
+    int maxScroll = wmCount > WM_VIS ? wmCount - WM_VIS : 0;
+    if (wmScroll > maxScroll) wmScroll = maxScroll;
+    if (wmScroll < 0) wmScroll = 0;
+    bool scrollable = wmCount > WM_VIS;
+    int itemW = scrollable ? SCR_W - 34 : SCR_W - 12;
+    for (int v = 0; v < WM_VIS; v++) {
+        int idx = wmScroll + v;
+        if (idx >= wmCount) break;
+        WMFixture& f = wmFixtures[idx];
+        int y = WM_LIST_TOP + v * WM_ITEM_H;
+        tft.fillRoundRect(6, y, itemW, WM_ITEM_H - 5, 6, COL_CARD);
+        tft.fillRoundRect(6, y, 5, WM_ITEM_H - 5, 2, f.live ? COL_GOOD : COL_ACCENT);
+        tft.setTextSize(1); tft.setTextColor(COL_TEXT, COL_CARD);
+        tft.drawString(f.home + " - " + f.away, 16, y + 5);
+        if (f.live) {
+            tft.setTextColor(COL_GOOD, COL_CARD);
+            tft.drawString(String(f.goalsHome) + ":" + String(f.goalsAway) +
+                            "  " + String(f.elapsed) + "'", 16, y + 20);
+        } else {
+            tft.setTextColor(COL_MUTE, COL_CARD);
+            tft.drawString(wmShortDate(f.dateStr), 16, y + 20);
+        }
+    }
+    if (scrollable) {
+        int ax = SCR_W - 26;
+        tft.fillRoundRect(ax, WM_LIST_TOP, 22, 78, 6, COL_CARD);
+        tft.fillTriangle(ax + 11, WM_LIST_TOP + 8, ax + 4, WM_LIST_TOP + 24, ax + 18, WM_LIST_TOP + 24, COL_ACCENT);
+        int by = WM_LIST_TOP + 86;
+        tft.fillRoundRect(ax, by, 22, 78, 6, COL_CARD);
+        tft.fillTriangle(ax + 11, by + 70, ax + 4, by + 54, ax + 18, by + 54, COL_ACCENT);
+    }
+}
+void drawWmDetail() {
+    if (wmSel < 0 || wmSel >= wmCount) { switchScreen(SCR_WM_LIST); return; }
+    WMFixture& f = wmFixtures[wmSel];
+    tft.fillScreen(COL_BG);
+    drawHomeIcon(tft, 2, 3);
+    tft.fillRoundRect(32, 3, 90, 24, 8, COL_CARD2);
+    tft.setTextSize(1); tft.setTextColor(COL_TEXT, COL_CARD2);
+    tft.drawString("Zur Liste", 48, 11);
+
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT);
+    tft.drawString(f.home, 20, 40);
+    tft.drawString(f.away, 20, 66);
+
+    if (f.live) {
+        tft.setTextSize(3); tft.setTextColor(COL_GOOD);
+        tft.drawString(String(f.goalsHome) + " : " + String(f.goalsAway), 200, 44);
+        tft.setTextSize(1); tft.setTextColor(COL_ACCENT);
+        tft.drawString("Minute " + String(f.elapsed) + "'  (" + f.statusShort + ")", 200, 78);
+    } else {
+        tft.setTextSize(1); tft.setTextColor(COL_MUTE);
+        tft.drawString("Anstoss: " + wmShortDate(f.dateStr), 200, 50);
+    }
+
+    tft.drawFastHLine(16, 100, SCR_W - 32, COL_CARD2);
+    tft.setTextSize(1); tft.setTextColor(COL_TEXT);
+    tft.drawString("Gewinn-Wahrscheinlichkeit:", 16, 110);
+
+    if (f.predHome < 0) {
+        tft.fillRoundRect(16, 130, 150, 30, 8, COL_ACCENT);
+        tft.setTextColor(COL_DARK, COL_ACCENT);
+        tft.drawString("Vorhersage laden", 32, 138);
+        return;
+    }
+    int barY = 134, barH = 16, barW = SCR_W - 32;
+    int wH = barW * f.predHome / 100, wD = barW * f.predDraw / 100, wA = barW * f.predAway / 100;
+    tft.fillRect(16, barY, wH, barH, COL_GOOD);
+    tft.fillRect(16 + wH, barY, wD, barH, COL_MUTE);
+    tft.fillRect(16 + wH + wD, barY, wA, barH, COL_BAD);
+    tft.setTextSize(1); tft.setTextColor(COL_TEXT);
+    tft.drawString(f.home + ": " + String(f.predHome) + "%", 16, barY + 22);
+    tft.drawString("Unentsch.: " + String(f.predDraw) + "%", 16, barY + 36);
+    tft.drawString(f.away + ": " + String(f.predAway) + "%", 16, barY + 50);
+}
+void wmHandleTouch(int x, int y) {
+    if (handleHomeTap(x, y)) return;
+    if (currentScreen == SCR_WM_LIST) {
+        if (!wifiIsConnected()) return;
+        if (wmCount == 0 && !wmLoading) {
+            wmLoading = true; drawWmList();
+            wmFetchFixtures();
+            wmLoading = false; drawWmList();
+            return;
+        }
+        bool scrollable = wmCount > WM_VIS;
+        if (scrollable && x >= SCR_W - 28) {
+            if (y < WM_LIST_TOP + 82) wmScroll--; else wmScroll++;
+            drawWmList(); return;
+        }
+        if (y >= WM_LIST_TOP) {
+            int v = (y - WM_LIST_TOP) / WM_ITEM_H, idx = wmScroll + v;
+            if (v < WM_VIS && idx < wmCount) { wmSel = idx; switchScreen(SCR_WM_DETAIL); }
+        }
+        return;
+    }
+    if (currentScreen == SCR_WM_DETAIL) {
+        if (y < TAB_H && x >= 32 && x < 122) { switchScreen(SCR_WM_LIST); return; }
+        if (wmSel >= 0 && wmFixtures[wmSel].predHome < 0 &&
+            y >= 130 && y <= 160 && x >= 16 && x <= 166) {
+            wmFetchPrediction(wmSel);
+            drawWmDetail();
+            return;
+        }
+        return;
+    }
+}
+
 // ── Touch router ──────────────────────────────────
 void handleTouch(int x, int y) {
     if (currentScreen == SCR_HOME) {
-        if (x >= 292 && y < TAB_H) { runCalibration(); redrawCurrent(); return; }
+        if (x >= 292 && y < TAB_H) { switchScreen(SCR_SETTINGS); return; }
         if (y < 30) return;
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < HOME_TILE_COUNT; i++) {
             HomeTile& t = homeTiles[i];
             if (x >= t.x && x < t.x + t.w && y >= t.y && y < t.y + t.h) {
                 if (t.target == SCR_CALC) calcClear();
@@ -1150,6 +2058,20 @@ void handleTouch(int x, int y) {
         }
         return;
     }
+
+    if (currentScreen == SCR_SETTINGS) { settingsHandleTouch(x, y); return; }
+    if (currentScreen == SCR_WIFI_SETUP) { wifiHandleTouch(x, y); return; }
+
+    if (currentScreen == SCR_TTT_SELECT) {
+        if (handleHomeTap(x, y)) return;
+        if (x < 154 && y >= 50 && y <= 200) { tttVsAI = true; tttStartGame(); switchScreen(SCR_TTT); return; }
+        if (x >= 166 && y >= 50 && y <= 200) { tttVsAI = false; tttStartGame(); switchScreen(SCR_TTT); return; }
+        return;
+    }
+    if (currentScreen == SCR_TTT) { tttHandleTouch(x, y); return; }
+
+    if (currentScreen == SCR_NEWS_LIST || currentScreen == SCR_NEWS_DETAIL) { newsHandleTouch(x, y); return; }
+    if (currentScreen == SCR_WM_LIST || currentScreen == SCR_WM_DETAIL) { wmHandleTouch(x, y); return; }
 
     if (currentScreen == SCR_NOTES_LIST) {
         if (handleHomeTap(x, y)) return;

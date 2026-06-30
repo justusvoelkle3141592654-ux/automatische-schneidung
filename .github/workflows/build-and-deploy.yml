@@ -30,6 +30,8 @@ jobs:
           pip install platformio
 
       - name: Firmware kompilieren
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
         run: cd cyd-firmware && pio run -e cyd
 
       - name: Firmware-Binaries in Web-Verzeichnis kopieren
