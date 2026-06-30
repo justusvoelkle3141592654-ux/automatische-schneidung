@@ -3,6 +3,9 @@
 #include <SPI.h>
 #include <XPT2046_Touchscreen.h>
 #include <Preferences.h>
+#include <math.h>
+#include <stdio.h>
+#include "photos.h"
 
 // ── Touch SPI pins (VSPI, custom CYD pins) ──────────────
 #define TOUCH_CS   33
@@ -25,6 +28,12 @@ TFT_eSPI tft;
 SPIClass touchSPI(VSPI);
 XPT2046_Touchscreen touch(TOUCH_CS, TOUCH_IRQ);
 Preferences prefs;
+
+// Voller Bildschirm-Sprite-Puffer fuer flackerfreies Zeichnen
+// (wird nur dort benutzt, wo vorher pro Frame/Tastendruck der ganze
+//  Bereich geloescht wurde -> Flappy Bird & Notizen-Editor)
+TFT_eSprite spr = TFT_eSprite(&tft);
+bool sprOK = false;
 
 // ── Palette (assigned at runtime) ───────────────────
 uint16_t COL_BG, COL_CARD, COL_CARD2, COL_ACCENT, COL_ACCENT2,
@@ -61,9 +70,18 @@ void setupPalette() {
     QBTN_COLORS[3] = tft.color565(0, 150, 136);
 }
 
+// Dunklere, zur Kategorie passende Hintergrundfarbe ableiten
+// ("ein bisschen mehr Hintergrundfarbe" statt einfarbig dunkelgrau)
+uint16_t tintDark(uint16_t c565) {
+    uint8_t r = (c565 >> 11) & 0x1F, g = (c565 >> 5) & 0x3F, b = c565 & 0x1F;
+    r = (uint8_t)(r * 0.22f); g = (uint8_t)(g * 0.22f); b = (uint8_t)(b * 0.22f);
+    return (r << 11) | (g << 5) | b;
+}
+
 // ── App state ──────────────────────────────────────
 enum Screen { SCR_HOME, SCR_NOTES_LIST, SCR_NOTES_EDIT, SCR_QUIZ_SELECT, SCR_QUIZ,
-              SCR_GAME_SELECT, SCR_SNAKE, SCR_FLAPPY, SCR_PICTURES };
+              SCR_GAME_SELECT, SCR_SNAKE, SCR_FLAPPY, SCR_PICTURES,
+              SCR_CALC, SCR_STOPWATCH };
 Screen currentScreen = SCR_HOME;
 unsigned long lastTouchMs = 0;
 
@@ -185,14 +203,38 @@ const int FL_SPEED = 30;
 #define FL_TOP (GY0 + 2)
 #define FL_BOT (SCR_H - 2)
 
+// ── Bilder-Galerie ──────────────────────────────
+#define PIC_COUNT 6
+const char* PIC_NAMES[PIC_COUNT] = { "Katze 1", "Katze 2", "Katze 3", "Katze 4", "Katze 5", "Katze 6" };
+int picIndex = 0;
+
+// ── Taschenrechner ──────────────────────────────
+String calInput = "0";
+double calFirst = 0;
+char   calOp = 0;
+bool   calNewEntry = true;
+const char* CALC_LABELS[4][4] = {
+    {"7","8","9","/"},
+    {"4","5","6","*"},
+    {"1","2","3","-"},
+    {"C","0",".","+"}
+};
+
+// ── Stoppuhr ─────────────────────────────────────
+unsigned long swElapsed = 0;
+unsigned long swStartMs = 0;
+bool swRunning = false;
+unsigned long swLastDraw = 0;
+
 // ── Forward declarations ──────────────────────────
-void drawHomeIcon(int x, int y);
+void drawHomeIcon(TFT_eSPI& g, int x, int y);
 bool handleHomeTap(int x, int y);
 void drawGear(int cx, int cy);
+void initHomeTiles();
 void drawHomeScreen();
 void drawNotesList();
 void drawNotesEdit();
-void drawKeyboard();
+void drawKeyboard(TFT_eSPI& g);
 void drawQuizSelect();
 void drawQuiz();
 void drawGameSelect();
@@ -205,6 +247,9 @@ void initFlappy();
 void drawFlappyHeader();
 void drawFlappyField();
 void moveFlappy();
+void drawCalcScreen();
+void drawStopwatchScreen();
+void drawStopwatchTime();
 void handleTouch(int x, int y);
 void switchScreen(Screen s);
 void redrawCurrent();
@@ -256,6 +301,9 @@ void setup() {
     setupPalette();
     tft.fillScreen(COL_BG);
 
+    spr.setColorDepth(16);
+    sprOK = (spr.createSprite(SCR_W, SCR_H) != nullptr);
+
     touchSPI.begin(TOUCH_CLK, TOUCH_MISO, TOUCH_MOSI, TOUCH_CS);
     touch.begin(touchSPI);
     touch.setRotation(0);   // raw orientation; calibration handles the rest
@@ -265,6 +313,7 @@ void setup() {
     snBest = prefs.getInt("snbest", 0);
     flBest = prefs.getInt("flbest", 0);
     randomSeed(esp_random());
+    initHomeTiles();
 
     touchCal = prefs.getBool("tcal", false);
     if (touchCal) {
@@ -300,6 +349,11 @@ void loop() {
         millis() - flLastMove > (unsigned long)FL_SPEED) {
         flLastMove = millis();
         moveFlappy();
+    }
+    if (currentScreen == SCR_STOPWATCH && swRunning &&
+        millis() - swLastDraw > 60UL) {
+        swLastDraw = millis();
+        drawStopwatchTime();
     }
     if (touch.tirqTouched() && touch.touched()) {
         TS_Point p = touch.getPoint();
@@ -365,12 +419,14 @@ void runCalibration() {
 }
 
 // ── Home icon (kleiner Button, ersetzt die alte 3er-Tableiste) ──
-void drawHomeIcon(int x, int y) {
-    tft.fillRoundRect(x, y, 28, 24, 6, COL_CARD);
+// nimmt eine TFT_eSPI&, damit er sowohl direkt aufs Display als auch
+// in den Sprite-Puffer zeichnen kann (fuer flackerfreie Screens)
+void drawHomeIcon(TFT_eSPI& g, int x, int y) {
+    g.fillRoundRect(x, y, 28, 24, 6, COL_CARD);
     // simple house glyph
-    tft.fillTriangle(x + 14, y + 3, x + 4, y + 12, x + 24, y + 12, COL_ACCENT);
-    tft.fillRect(x + 7, y + 12, 14, 9, COL_ACCENT);
-    tft.fillRect(x + 12, y + 15, 4, 6, COL_CARD);
+    g.fillTriangle(x + 14, y + 3, x + 4, y + 12, x + 24, y + 12, COL_ACCENT);
+    g.fillRect(x + 7, y + 12, 14, 9, COL_ACCENT);
+    g.fillRect(x + 12, y + 15, 4, 6, COL_CARD);
 }
 bool handleHomeTap(int x, int y) {
     if (x < 32 && y < TAB_H) { switchScreen(SCR_HOME); return true; }
@@ -397,8 +453,14 @@ void redrawCurrent() {
     else if (currentScreen == SCR_QUIZ)         drawQuiz();
     else if (currentScreen == SCR_GAME_SELECT)  drawGameSelect();
     else if (currentScreen == SCR_PICTURES)     drawPictures();
+    else if (currentScreen == SCR_CALC)         drawCalcScreen();
+    else if (currentScreen == SCR_STOPWATCH)    drawStopwatchScreen();
     else if (currentScreen == SCR_SNAKE) { if (snLen == 0) initSnake(); else drawSnakeFull(); }
-    else if (currentScreen == SCR_FLAPPY) drawFlappyHeader(); // Feld zeichnet moveFlappy/initFlappy
+    else if (currentScreen == SCR_FLAPPY) {
+        drawFlappyHeader();
+        drawFlappyField();
+        if (sprOK) spr.pushSprite(0, 0);
+    }
 }
 
 // ── Word-wrap helper ────────────────────────────
@@ -423,46 +485,67 @@ void iconGamepad(int cx, int cy) {
     tft.fillCircle(cx + 12, cy + 6, 4, COL_TEXT);
 }
 void iconQuiz(int cx, int cy) {
-    tft.fillCircle(cx, cy, 18, COL_DARK);
+    tft.fillCircle(cx, cy, 16, COL_DARK);
     tft.setTextColor(COL_TEXT, COL_DARK); tft.setTextSize(2);
     tft.drawString("?", cx - 5, cy - 8);
 }
 void iconNotes(int cx, int cy) {
-    tft.fillRoundRect(cx - 16, cy - 18, 32, 36, 4, COL_DARK);
+    tft.fillRoundRect(cx - 14, cy - 16, 28, 32, 4, COL_DARK);
     for (int i = 0; i < 3; i++)
-        tft.drawFastHLine(cx - 10, cy - 8 + i * 8, 20, COL_TEXT);
+        tft.drawFastHLine(cx - 8, cy - 7 + i * 7, 16, COL_TEXT);
 }
 void iconPic(int cx, int cy) {
-    tft.fillRoundRect(cx - 18, cy - 14, 36, 28, 4, COL_DARK);
-    tft.fillCircle(cx - 8, cy - 4, 4, tft.color565(255, 205, 60));
-    tft.fillTriangle(cx - 15, cy + 9, cx - 1, cy - 3, cx + 13, cy + 9, tft.color565(60, 180, 90));
+    tft.fillRoundRect(cx - 16, cy - 12, 32, 24, 4, COL_DARK);
+    tft.fillCircle(cx - 7, cy - 3, 3, tft.color565(255, 205, 60));
+    tft.fillTriangle(cx - 13, cy + 8, cx - 1, cy - 2, cx + 11, cy + 8, tft.color565(60, 180, 90));
+}
+void iconCalc(int cx, int cy) {
+    tft.fillRoundRect(cx - 14, cy - 16, 28, 32, 4, COL_DARK);
+    tft.fillRect(cx - 10, cy - 12, 20, 7, COL_TEXT);
+    for (int r = 0; r < 3; r++)
+        for (int c = 0; c < 3; c++)
+            tft.fillCircle(cx - 8 + c * 8, cy + 1 + r * 6, 2, COL_TEXT);
+}
+void iconStopwatch(int cx, int cy) {
+    tft.fillCircle(cx, cy + 2, 14, COL_DARK);
+    tft.drawCircle(cx, cy + 2, 14, COL_TEXT);
+    tft.drawLine(cx, cy + 2, cx, cy - 6, COL_TEXT);
+    tft.drawLine(cx, cy + 2, cx + 6, cy + 4, COL_TEXT);
+    tft.fillRect(cx - 3, cy - 16, 6, 4, COL_TEXT);
 }
 
 // ══ HOME ═════════════════════════════════════════
+struct HomeTile { int x, y, w, h; uint16_t col; const char* label; int icon; Screen target; };
+HomeTile homeTiles[6];
+void initHomeTiles() {
+    int x0 = 4, x1 = 108, x2 = 212, w = 104, h = 95;
+    int y0 = 34, y1 = 135;
+    homeTiles[0] = {x0, y0, w, h, tft.color565(41, 98, 255),  "Spiele",  0, SCR_GAME_SELECT};
+    homeTiles[1] = {x1, y0, w, h, tft.color565(156, 39, 176), "Quiz",    1, SCR_QUIZ_SELECT};
+    homeTiles[2] = {x2, y0, w, h, tft.color565(0, 150, 136),  "Notizen", 2, SCR_NOTES_LIST};
+    homeTiles[3] = {x0, y1, w, h, tft.color565(233, 30, 99),  "Bilder",  3, SCR_PICTURES};
+    homeTiles[4] = {x1, y1, w, h, tft.color565(255, 152, 0),  "Rechner", 4, SCR_CALC};
+    homeTiles[5] = {x2, y1, w, h, tft.color565(0, 191, 165),  "Stoppuhr",5, SCR_STOPWATCH};
+}
 void drawHomeScreen() {
     tft.fillScreen(COL_BG);
     tft.setTextSize(2); tft.setTextColor(COL_ACCENT);
     tft.drawString("CYD Mini-Apps", 84, 6);
     drawGear(305, 15);
 
-    struct Tile { int x, y, w, h; uint16_t col; const char* label; int icon; };
-    Tile tiles[4] = {
-        {5,   40, 150, 90, tft.color565(41, 98, 255),  "Spiele",   0},
-        {165, 40, 150, 90, tft.color565(156, 39, 176), "Quiz",     1},
-        {5,  140, 150, 90, tft.color565(0, 150, 136),  "Notizen",  2},
-        {165,140, 150, 90, tft.color565(233, 30, 99),  "Bilder",   3},
-    };
-    for (int i = 0; i < 4; i++) {
-        Tile& t = tiles[i];
+    for (int i = 0; i < 6; i++) {
+        HomeTile& t = homeTiles[i];
         tft.fillRoundRect(t.x, t.y, t.w, t.h, 12, t.col);
-        int cx = t.x + t.w / 2, cy = t.y + 32;
-        if (t.icon == 0) iconGamepad(cx, cy);
+        int cx = t.x + t.w / 2, cy = t.y + 30;
+        if      (t.icon == 0) iconGamepad(cx, cy);
         else if (t.icon == 1) iconQuiz(cx, cy);
         else if (t.icon == 2) iconNotes(cx, cy);
-        else iconPic(cx, cy);
-        tft.setTextSize(2); tft.setTextColor(COL_TEXT, t.col);
-        int tw = strlen(t.label) * 12;
-        tft.drawString(t.label, t.x + (t.w - tw) / 2, t.y + t.h - 26);
+        else if (t.icon == 3) iconPic(cx, cy);
+        else if (t.icon == 4) iconCalc(cx, cy);
+        else                  iconStopwatch(cx, cy);
+        tft.setTextSize(1); tft.setTextColor(COL_TEXT, t.col);
+        int tw = strlen(t.label) * 6;
+        tft.drawString(t.label, t.x + (t.w - tw) / 2, t.y + t.h - 18);
     }
 }
 
@@ -476,7 +559,7 @@ String firstLine(const String& s) {
 }
 void drawNotesList() {
     tft.fillScreen(COL_BG);
-    drawHomeIcon(2, 3);
+    drawHomeIcon(tft, 2, 3);
     tft.fillRoundRect(36, 3, SCR_W - 42, 24, 8, COL_ACCENT2);
     tft.setTextSize(2);
     tft.setTextColor(COL_DARK, COL_ACCENT2);
@@ -514,29 +597,32 @@ void drawNotesList() {
     }
 }
 
-// ══ NOTES EDIT (mit ein-/ausklappbarer Tastatur) ════════
-// Tasten "lassen viel Platz" -> Tastatur ist jetzt per Knopf einklappbar,
-// dann nutzt der Textbereich fast den ganzen Bildschirm.
+// ══ NOTES EDIT (mit ein-/ausklappbarer Tastatur, flackerfrei) ════════
+// Tasten "lassen viel Platz" -> Tastatur ist per Knopf einklappbar.
+// Zeichnet komplett in den Sprite-Puffer und zeigt das Ergebnis erst
+// am Ende in EINEM Schritt an (kein fillScreen direkt aufs Display
+// mehr bei jedem Tastendruck -> kein Flackern).
 void drawNotesEdit() {
-    tft.fillScreen(COL_BG);
-    drawHomeIcon(2, 3);
-    tft.fillRoundRect(32, 3, 92, 24, 8, COL_ACCENT);
-    tft.fillRoundRect(126, 3, 92, 24, 8, COL_BAD);
-    tft.fillRoundRect(220, 3, 98, 24, 8, kbdExpanded ? COL_ACCENT2 : COL_CARD2);
-    tft.setTextSize(1);
-    tft.setTextColor(COL_DARK, COL_ACCENT);
-    tft.drawString("Speichern", 44, 11);
-    tft.setTextColor(COL_TEXT, COL_BAD);
-    tft.drawString("Loeschen", 140, 11);
-    tft.setTextColor(COL_TEXT, kbdExpanded ? COL_ACCENT2 : COL_CARD2);
-    tft.drawString(kbdExpanded ? "Tastatur ^" : "Tastatur v", 230, 11);
+    TFT_eSPI& g = sprOK ? (TFT_eSPI&)spr : tft;
+    g.fillScreen(COL_BG);
+    drawHomeIcon(g, 2, 3);
+    g.fillRoundRect(32, 3, 92, 24, 8, COL_ACCENT);
+    g.fillRoundRect(126, 3, 92, 24, 8, COL_BAD);
+    g.fillRoundRect(220, 3, 98, 24, 8, kbdExpanded ? COL_ACCENT2 : COL_CARD2);
+    g.setTextSize(1);
+    g.setTextColor(COL_DARK, COL_ACCENT);
+    g.drawString("Speichern", 44, 11);
+    g.setTextColor(COL_TEXT, COL_BAD);
+    g.drawString("Loeschen", 140, 11);
+    g.setTextColor(COL_TEXT, kbdExpanded ? COL_ACCENT2 : COL_CARD2);
+    g.drawString(kbdExpanded ? "Tastatur ^" : "Tastatur v", 230, 11);
 
     int textTop = TAB_H + 2;
     int textBottom = kbdExpanded ? KBD_Y : (SCR_H - 2);
-    tft.drawRoundRect(2, textTop, SCR_W - 4, textBottom - textTop, 6, COL_CARD2);
+    g.drawRoundRect(2, textTop, SCR_W - 4, textBottom - textTop, 6, COL_CARD2);
 
-    tft.setTextColor(COL_TEXT, COL_BG);
-    tft.setTextSize(1);
+    g.setTextColor(COL_TEXT, COL_BG);
+    g.setTextSize(1);
     const int charPerLine = 52, lineH = 11;
     const int maxLines = (textBottom - textTop - 8) / lineH;
     const int textY = textTop + 6;
@@ -551,49 +637,50 @@ void drawNotesEdit() {
     linesBuf[lineCount++] = cur;
     int start = (lineCount > maxLines) ? lineCount - maxLines : 0;
     for (int i = start; i < lineCount && i < lineCount; i++)
-        tft.drawString(linesBuf[i], 8, textY + (i - start) * lineH);
+        g.drawString(linesBuf[i], 8, textY + (i - start) * lineH);
 
-    if (kbdExpanded) drawKeyboard();
+    if (kbdExpanded) drawKeyboard(g);
     else {
-        tft.setTextColor(COL_MUTE);
-        tft.drawString("Tippen im Feld oder 'Tastatur' oeffnet die Tasten", 8, SCR_H - 14);
+        g.setTextColor(COL_MUTE);
+        g.drawString("Tippen im Feld oder 'Tastatur' oeffnet die Tasten", 8, SCR_H - 14);
     }
+    if (sprOK) spr.pushSprite(0, 0);
 }
-void drawKeyboard() {
+void drawKeyboard(TFT_eSPI& g) {
     for (int i = 0; i < 10; i++) {
         int kx = i * KEY_W, ky = KBD_Y;
-        tft.fillRoundRect(kx + 1, ky + 1, KEY_W - 2, KEY_H - 2, 4, COL_KEY);
-        tft.setTextColor(COL_TEXT, COL_KEY); tft.setTextSize(1);
-        tft.drawString(ROW0[i], kx + 11, ky + 12);
+        g.fillRoundRect(kx + 1, ky + 1, KEY_W - 2, KEY_H - 2, 4, COL_KEY);
+        g.setTextColor(COL_TEXT, COL_KEY); g.setTextSize(1);
+        g.drawString(ROW0[i], kx + 11, ky + 12);
     }
     for (int i = 0; i < 10; i++) {
         int kx = i * KEY_W, ky = KBD_Y + KEY_H;
         uint16_t col = (i == 9) ? COL_ACCENT2 : COL_KEY;
-        tft.fillRoundRect(kx + 1, ky + 1, KEY_W - 2, KEY_H - 2, 4, col);
-        tft.setTextColor(COL_TEXT, col); tft.setTextSize(1);
-        if (i == 9) tft.drawString("DEL", kx + 5, ky + 12);
-        else        tft.drawString(ROW1[i], kx + 11, ky + 12);
+        g.fillRoundRect(kx + 1, ky + 1, KEY_W - 2, KEY_H - 2, 4, col);
+        g.setTextColor(COL_TEXT, col); g.setTextSize(1);
+        if (i == 9) g.drawString("DEL", kx + 5, ky + 12);
+        else        g.drawString(ROW1[i], kx + 11, ky + 12);
     }
     for (int i = 0; i < 10; i++) {
         int kx = i * KEY_W, ky = KBD_Y + KEY_H * 2;
         uint16_t col = (i >= 7) ? COL_KEYSP : COL_KEY;
-        tft.fillRoundRect(kx + 1, ky + 1, KEY_W - 2, KEY_H - 2, 4, col);
-        tft.setTextColor(COL_TEXT, col); tft.setTextSize(1);
+        g.fillRoundRect(kx + 1, ky + 1, KEY_W - 2, KEY_H - 2, 4, col);
+        g.setTextColor(COL_TEXT, col); g.setTextSize(1);
         int tx = (strlen(ROW2[i]) > 1) ? kx + 7 : kx + 11;
-        tft.drawString(ROW2[i], tx, ky + 12);
+        g.drawString(ROW2[i], tx, ky + 12);
     }
     int ky3 = KBD_Y + KEY_H * 3;
-    tft.fillRoundRect(1, ky3 + 1, KEY_W - 2, KEY_H - 2, 4, COL_KEY);
-    tft.fillRoundRect(KEY_W + 1, ky3 + 1, KEY_W - 2, KEY_H - 2, 4, COL_KEY);
-    tft.fillRoundRect(KEY_W * 2 + 1, ky3 + 1, 192 - 2, KEY_H - 2, 4, COL_KEYSP);
-    tft.fillRoundRect(KEY_W * 2 + 193, ky3 + 1, 63, KEY_H - 2, 4, COL_ACCENT);
-    tft.setTextColor(COL_TEXT, COL_KEY); tft.setTextSize(1);
-    tft.drawString(".", 11, ky3 + 12);
-    tft.drawString(",", KEY_W + 11, ky3 + 12);
-    tft.setTextColor(COL_TEXT, COL_KEYSP);
-    tft.drawString("LEER", KEY_W * 2 + 76, ky3 + 12);
-    tft.setTextColor(COL_DARK, COL_ACCENT);
-    tft.drawString("NL", KEY_W * 2 + 213, ky3 + 12);
+    g.fillRoundRect(1, ky3 + 1, KEY_W - 2, KEY_H - 2, 4, COL_KEY);
+    g.fillRoundRect(KEY_W + 1, ky3 + 1, KEY_W - 2, KEY_H - 2, 4, COL_KEY);
+    g.fillRoundRect(KEY_W * 2 + 1, ky3 + 1, 192 - 2, KEY_H - 2, 4, COL_KEYSP);
+    g.fillRoundRect(KEY_W * 2 + 193, ky3 + 1, 63, KEY_H - 2, 4, COL_ACCENT);
+    g.setTextColor(COL_TEXT, COL_KEY); g.setTextSize(1);
+    g.drawString(".", 11, ky3 + 12);
+    g.drawString(",", KEY_W + 11, ky3 + 12);
+    g.setTextColor(COL_TEXT, COL_KEYSP);
+    g.drawString("LEER", KEY_W * 2 + 76, ky3 + 12);
+    g.setTextColor(COL_DARK, COL_ACCENT);
+    g.drawString("NL", KEY_W * 2 + 213, ky3 + 12);
 }
 
 // ── kleine Badge-Icons fuer die 5 Quiz-Kategorien ("fuenf Bilder") ──
@@ -605,12 +692,15 @@ void drawCatBadge(int x, int y, int cat) {
     tft.drawString(l, x - 6, y - 8);
 }
 
-// ══ QUIZ-AUSWAHL (Portrait-Karte, 5 Quizze zur Auswahl) ══════
+// ══ QUIZ-AUSWAHL (Portrait-Karte, mehr Hintergrundfarbe) ══════
 void drawQuizSelect() {
-    tft.fillScreen(COL_DARKER);
+    uint16_t bgTint = tintDark(QCAT_COLORS[0]);
+    tft.fillScreen(bgTint);
+    tft.fillRect(QCARD_X - 5, 0, 5, SCR_H, QCAT_COLORS[2]);
+    tft.fillRect(QCARD_X + QCARD_W, 0, 5, SCR_H, QCAT_COLORS[3]);
     tft.fillRoundRect(QCARD_X, QCARD_Y, QCARD_W, QCARD_H, 14, COL_BG);
     tft.drawRoundRect(QCARD_X, QCARD_Y, QCARD_W, QCARD_H, 14, COL_ACCENT);
-    drawHomeIcon(QCARD_X + 4, QCARD_Y + 4);
+    drawHomeIcon(tft, QCARD_X + 4, QCARD_Y + 4);
     tft.setTextSize(1); tft.setTextColor(COL_TEXT);
     tft.drawString("Quiz waehlen", QCARD_X + 70, QCARD_Y + 12);
 
@@ -626,12 +716,15 @@ void drawQuizSelect() {
     tft.drawString("Kategorie antippen", QCARD_X + 48, QCARD_Y + 218);
 }
 
-// ══ QUIZ (Portrait-Karte, bunte Buttons) ═════════════════════
+// ══ QUIZ (Portrait-Karte, bunte Buttons, farbiger Rahmen) ═════════════
 void drawQuiz() {
-    tft.fillScreen(COL_DARKER);
+    uint16_t bgTint = tintDark(QCAT_COLORS[qCat]);
+    tft.fillScreen(bgTint);
+    tft.fillRect(QCARD_X - 5, 0, 5, SCR_H, QCAT_COLORS[qCat]);
+    tft.fillRect(QCARD_X + QCARD_W, 0, 5, SCR_H, QCAT_COLORS[qCat]);
     tft.fillRoundRect(QCARD_X, QCARD_Y, QCARD_W, QCARD_H, 14, COL_BG);
     tft.drawRoundRect(QCARD_X, QCARD_Y, QCARD_W, QCARD_H, 14, QCAT_COLORS[qCat]);
-    drawHomeIcon(QCARD_X + 4, QCARD_Y + 4);
+    drawHomeIcon(tft, QCARD_X + 4, QCARD_Y + 4);
 
     if (qFinished) {
         tft.setTextSize(2); tft.setTextColor(QCAT_COLORS[qCat]);
@@ -695,7 +788,7 @@ void iconBirdMini(int cx, int cy) {
 // ══ SPIELE-AUSWAHL ═══════════════════════════════
 void drawGameSelect() {
     tft.fillScreen(COL_BG);
-    drawHomeIcon(2, 3);
+    drawHomeIcon(tft, 2, 3);
     tft.setTextSize(2); tft.setTextColor(COL_TEXT);
     tft.drawString("Spiele waehlen", 90, 6);
 
@@ -714,33 +807,33 @@ void drawGameSelect() {
     tft.drawString("Best: " + String(flBest), 212, 182);
 }
 
-// ══ BILDER (Platzhalter fuer das Katzenbild) ═════════════
-void drawCatPlaceholder(int cx, int cy) {
-    // Wird ersetzt, sobald das echte Foto als Bitmap eingebaut wird.
-    tft.fillCircle(cx, cy, 34, tft.color565(235, 200, 150));
-    tft.fillTriangle(cx - 30, cy - 16, cx - 14, cy - 38, cx - 6, cy - 14, tft.color565(235, 200, 150));
-    tft.fillTriangle(cx + 30, cy - 16, cx + 14, cy - 38, cx + 6, cy - 14, tft.color565(235, 200, 150));
-    tft.fillCircle(cx - 12, cy - 4, 3, COL_DARK);
-    tft.fillCircle(cx + 12, cy - 4, 3, COL_DARK);
-    tft.fillTriangle(cx - 3, cy + 6, cx + 3, cy + 6, cx, cy + 11, tft.color565(255, 140, 150));
-    for (int i = -1; i <= 1; i++) {
-        tft.drawLine(cx - 20, cy + 4 + i * 5, cx - 40, cy + 2 + i * 5, COL_MUTE);
-        tft.drawLine(cx + 20, cy + 4 + i * 5, cx + 40, cy + 2 + i * 5, COL_MUTE);
-    }
+// ══ BILDER (navigierbare Galerie, 6 echte Fotos) ═════════════
+void drawPictureArrow(bool left) {
+    int x = left ? 16 : SCR_W - 38;
+    int y = 96;
+    tft.fillRoundRect(x, y, 22, 40, 6, COL_CARD);
+    if (left) tft.fillTriangle(x + 16, y + 6, x + 16, y + 34, x + 5, y + 20, COL_ACCENT);
+    else      tft.fillTriangle(x + 6, y + 6, x + 6, y + 34, x + 17, y + 20, COL_ACCENT);
 }
 void drawPictures() {
     tft.fillScreen(COL_BG);
-    drawHomeIcon(2, 3);
+    drawHomeIcon(tft, 2, 3);
     tft.setTextSize(2); tft.setTextColor(COL_TEXT);
     tft.drawString("Bilder", 140, 6);
 
     tft.fillRoundRect(90, 46, 140, 140, 10, COL_CARD);
     tft.drawRoundRect(90, 46, 140, 140, 10, COL_ACCENT);
-    drawCatPlaceholder(160, 116);
+    tft.setSwapBytes(true);
+    tft.pushImage(94, 50, PHOTO_SIZE, PHOTO_SIZE, PHOTOS[picIndex]);
+    tft.setSwapBytes(false);
+
+    drawPictureArrow(true);
+    drawPictureArrow(false);
 
     tft.setTextSize(1); tft.setTextColor(COL_MUTE);
-    tft.drawString("Eigenes Bild folgt bald!", 78, 200);
-    tft.drawString("Schick es mir, dann baue ich es fest ein.", 30, 214);
+    int tw = strlen(PIC_NAMES[picIndex]) * 6;
+    tft.drawString(PIC_NAMES[picIndex], (SCR_W - tw) / 2, 192);
+    tft.drawString(String(picIndex + 1) + " / " + String(PIC_COUNT), 142, 206);
 }
 
 // ══ SNAKE ═════════════════════════════════════
@@ -758,7 +851,7 @@ void snCell(int cx, int cy, uint16_t col) {
 }
 void drawSnakeHeader() {
     tft.fillRect(0, 0, SCR_W, GY0 - 4, COL_BG);
-    drawHomeIcon(2, 3);
+    drawHomeIcon(tft, 2, 3);
     tft.fillRoundRect(36, 6, 150, 18, 4, COL_CARD);
     tft.setTextSize(1); tft.setTextColor(COL_TEXT, COL_CARD);
     tft.drawString("Punkte " + String(snScore) + "   Best " + String(snBest), 42, 11);
@@ -822,29 +915,54 @@ void steerSnake(int x, int y) {
     snDir = nd;
 }
 
-// ══ FLAPPY BIRD ═══════════════════════════════════
+// ══ FLAPPY BIRD (flackerfrei via Sprite, bunter Hintergrund) ═════════
 void flappyResetPipe(int i, int fromX) {
     pipes[i].x = fromX;
     pipes[i].gapY = random(FL_TOP + 50, FL_BOT - 50);
     pipes[i].passed = false;
 }
 void drawFlappyHeader() {
-    tft.fillRect(0, 0, SCR_W, GY0 - 4, COL_BG);
-    drawHomeIcon(2, 3);
-    tft.fillRoundRect(36, 6, 150, 18, 4, COL_CARD);
-    tft.setTextSize(1); tft.setTextColor(COL_TEXT, COL_CARD);
-    tft.drawString("Punkte " + String(flScore) + "   Best " + String(flBest), 42, 11);
+    TFT_eSPI& g = sprOK ? (TFT_eSPI&)spr : tft;
+    g.fillRect(0, 0, SCR_W, GY0 - 4, COL_BG);
+    drawHomeIcon(g, 2, 3);
+    g.fillRoundRect(36, 6, 150, 18, 4, COL_CARD);
+    g.setTextSize(1); g.setTextColor(COL_TEXT, COL_CARD);
+    g.drawString("Punkte " + String(flScore) + "   Best " + String(flBest), 42, 11);
+}
+// Bunter Himmel-Verlauf + Gras statt einfarbiger Flaeche ("mehr Farben/Hintergrund")
+void drawFlappySky() {
+    TFT_eSPI& g = sprOK ? (TFT_eSPI&)spr : tft;
+    int bands = 8;
+    int bandH = (FL_BOT - GY0) / bands;
+    for (int b = 0; b < bands; b++) {
+        uint8_t r = 70 + b * 4, gr = 150 + b * 8, bl = 220 - b * 6;
+        if (gr > 255) gr = 255;
+        g.fillRect(0, GY0 + b * bandH, SCR_W, bandH + 1, g.color565(r, gr, bl));
+    }
+    g.fillRect(0, FL_BOT - 16, SCR_W, 16, g.color565(139, 94, 52));
+    g.fillRect(0, FL_BOT - 18, SCR_W, 4, g.color565(86, 196, 96));
 }
 void drawFlappyField() {
-    tft.fillRect(0, GY0, SCR_W, SCR_H - GY0, COL_BG);
+    TFT_eSPI& g = sprOK ? (TFT_eSPI&)spr : tft;
+    drawFlappySky();
     for (int i = 0; i < N_PIPES; i++) {
         int top = pipes[i].gapY - PIPE_GAP / 2;
         int bot = pipes[i].gapY + PIPE_GAP / 2;
-        if (top > FL_TOP) tft.fillRoundRect(pipes[i].x, FL_TOP, PIPE_W, top - FL_TOP, 4, COL_ACCENT2);
-        if (bot < FL_BOT) tft.fillRoundRect(pipes[i].x, bot, PIPE_W, FL_BOT - bot, 4, COL_ACCENT2);
+        uint16_t pipeCol = g.color565(60, 190, 90);
+        uint16_t pipeCap  = g.color565(40, 150, 70);
+        if (top > FL_TOP) {
+            g.fillRoundRect(pipes[i].x, FL_TOP, PIPE_W, top - FL_TOP, 4, pipeCol);
+            g.fillRoundRect(pipes[i].x - 2, top - 10, PIPE_W + 4, 10, 3, pipeCap);
+        }
+        if (bot < FL_BOT) {
+            g.fillRoundRect(pipes[i].x, bot, PIPE_W, FL_BOT - bot, 4, pipeCol);
+            g.fillRoundRect(pipes[i].x - 2, bot, PIPE_W + 4, 10, 3, pipeCap);
+        }
     }
-    tft.fillCircle(flBx, (int)flBy, 8, tft.color565(255, 205, 60));
-    tft.fillCircle(flBx + 3, (int)flBy - 3, 2, COL_DARK);
+    g.fillCircle(flBx, (int)flBy, 9, g.color565(255, 205, 60));
+    g.fillTriangle(flBx - 2, (int)flBy, flBx - 12, (int)flBy - 5, flBx - 12, (int)flBy + 5,
+                    g.color565(255, 140, 40));
+    g.fillCircle(flBx + 4, (int)flBy - 3, 2, COL_DARK);
 }
 void initFlappy() {
     flBy = (FL_TOP + FL_BOT) / 2; flVel = 0;
@@ -852,18 +970,21 @@ void initFlappy() {
     for (int i = 0; i < N_PIPES; i++) flappyResetPipe(i, SCR_W + i * 120);
     drawFlappyHeader();
     drawFlappyField();
+    if (sprOK) spr.pushSprite(0, 0);
 }
 void flappyGameOver() {
     flOver = true;
     if (flScore > flBest) { flBest = flScore; prefs.putInt("flbest", flBest); }
-    tft.fillRoundRect(38, 86, 244, 96, 10, COL_CARD);
-    tft.drawRoundRect(38, 86, 244, 96, 10, COL_BAD);
-    tft.setTextSize(3); tft.setTextColor(COL_BAD);
-    tft.drawString("Game Over", 76, 100);
-    tft.setTextSize(2); tft.setTextColor(COL_TEXT);
-    tft.drawString("Punkte: " + String(flScore), 98, 138);
-    tft.setTextSize(1); tft.setTextColor(COL_ACCENT);
-    tft.drawString("Tippen zum Neustart", 100, 164);
+    TFT_eSPI& g = sprOK ? (TFT_eSPI&)spr : tft;
+    g.fillRoundRect(38, 86, 244, 96, 10, COL_CARD);
+    g.drawRoundRect(38, 86, 244, 96, 10, COL_BAD);
+    g.setTextSize(3); g.setTextColor(COL_BAD);
+    g.drawString("Game Over", 76, 100);
+    g.setTextSize(2); g.setTextColor(COL_TEXT);
+    g.drawString("Punkte: " + String(flScore), 98, 138);
+    g.setTextSize(1); g.setTextColor(COL_ACCENT);
+    g.drawString("Tippen zum Neustart", 100, 164);
+    if (sprOK) spr.pushSprite(0, 0);
 }
 void moveFlappy() {
     flVel += 0.5f;
@@ -883,19 +1004,150 @@ void moveFlappy() {
         }
     }
     drawFlappyField();
+    if (sprOK) spr.pushSprite(0, 0);
+}
+
+// ══ TASCHENRECHNER ════════════════════════════════
+void calcClear() { calInput = "0"; calFirst = 0; calOp = 0; calNewEntry = true; }
+void calcAppendDigit(char d) {
+    if (calNewEntry) { calInput = String(d); calNewEntry = false; }
+    else if (calInput == "0") calInput = String(d);
+    else if (calInput.length() < 12) calInput += d;
+}
+void calcAppendDot() {
+    if (calNewEntry) { calInput = "0."; calNewEntry = false; return; }
+    if (calInput.indexOf('.') < 0 && calInput.length() < 11) calInput += ".";
+}
+String fmtCalc(double v) {
+    if (v == (long long)v && fabs(v) < 1e12) return String((long long)v);
+    String s = String(v, 6);
+    while (s.endsWith("0")) s.remove(s.length() - 1);
+    if (s.endsWith(".")) s.remove(s.length() - 1);
+    return s;
+}
+void calcEvaluate() {
+    double cur = calInput.toDouble();
+    double res = cur;
+    if (calOp == '+') res = calFirst + cur;
+    else if (calOp == '-') res = calFirst - cur;
+    else if (calOp == '*') res = calFirst * cur;
+    else if (calOp == '/') res = (cur == 0) ? NAN : (calFirst / cur);
+    calInput = isnan(res) ? "Fehler" : fmtCalc(res);
+    calOp = 0;
+    calNewEntry = true;
+}
+void calcSetOp(char op) {
+    if (calOp != 0 && !calNewEntry) calcEvaluate();
+    calFirst = calInput.toDouble();
+    calOp = op;
+    calNewEntry = true;
+}
+void drawCalcDisplay() {
+    tft.fillRoundRect(10, 30, SCR_W - 20, 40, 8, COL_DARK);
+    tft.setTextSize(3); tft.setTextColor(COL_TEXT, COL_DARK);
+    String shown = calInput;
+    if (shown.length() > 12) shown = shown.substring(shown.length() - 12);
+    int tw = shown.length() * 18;
+    tft.drawString(shown, SCR_W - 20 - tw, 42);
+}
+void drawCalcScreen() {
+    tft.fillScreen(COL_DARKER);
+    drawHomeIcon(tft, 2, 3);
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT);
+    tft.drawString("Rechner", 120, 4);
+    drawCalcDisplay();
+
+    int gx = 10, gy = 78, bw = 73, bh = 38, gap = 4;
+    for (int r = 0; r < 4; r++) {
+        for (int c = 0; c < 4; c++) {
+            int x = gx + c * (bw + gap), y = gy + r * (bh + gap);
+            const char* lbl = CALC_LABELS[r][c];
+            bool isOp = (c == 3) || (r == 3 && c == 0);
+            uint16_t col = isOp ? tft.color565(255, 152, 0) : COL_CARD;
+            tft.fillRoundRect(x, y, bw, bh, 8, col);
+            tft.setTextSize(2); tft.setTextColor(COL_TEXT, col);
+            int tw = strlen(lbl) * 12;
+            tft.drawString(lbl, x + (bw - tw) / 2, y + 10);
+        }
+    }
+}
+void calcHandleTouch(int x, int y) {
+    int gx = 10, gy = 78, bw = 73, bh = 38, gap = 4;
+    if (y < gy) return;
+    int r = (y - gy) / (bh + gap);
+    int c = (x - gx) / (bw + gap);
+    if (r < 0 || r > 3 || c < 0 || c > 3) return;
+    if ((y - gy) % (bh + gap) > bh) return;
+    if ((x - gx) % (bw + gap) > bw) return;
+    const char* lbl = CALC_LABELS[r][c];
+    if (r == 3 && c == 0) calcClear();
+    else if (c == 3) calcSetOp(lbl[0]);
+    else if (r == 3 && c == 2) calcAppendDot();
+    else calcAppendDigit(lbl[0]);
+    drawCalcScreen();
+}
+
+// ══ STOPPUHR ══════════════════════════════════════
+String formatStopwatch(unsigned long ms) {
+    unsigned long totalCs = ms / 10;
+    unsigned long cs = totalCs % 100;
+    unsigned long totalS = totalCs / 100;
+    unsigned long s = totalS % 60;
+    unsigned long m = totalS / 60;
+    char buf[16];
+    sprintf(buf, "%02lu:%02lu.%02lu", m, s, cs);
+    return String(buf);
+}
+void drawStopwatchTime() {
+    unsigned long now = swRunning ? swElapsed + (millis() - swStartMs) : swElapsed;
+    tft.fillRoundRect(40, 70, SCR_W - 80, 50, 10, COL_DARK);
+    tft.setTextSize(4); tft.setTextColor(COL_ACCENT, COL_DARK);
+    String t = formatStopwatch(now);
+    int tw = t.length() * 24;
+    tft.drawString(t, (SCR_W - tw) / 2, 83);
+}
+void drawStopwatchScreen() {
+    tft.fillScreen(COL_DARKER);
+    drawHomeIcon(tft, 2, 3);
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT);
+    tft.drawString("Stoppuhr", 110, 4);
+    drawStopwatchTime();
+
+    tft.fillRoundRect(40, 140, 110, 50, 10, swRunning ? COL_BAD : COL_GOOD);
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT, swRunning ? COL_BAD : COL_GOOD);
+    tft.drawString(swRunning ? "Stop" : "Start", 62, 156);
+
+    tft.fillRoundRect(170, 140, 110, 50, 10, COL_CARD2);
+    tft.setTextSize(2); tft.setTextColor(COL_TEXT, COL_CARD2);
+    tft.drawString("Reset", 196, 156);
+}
+void stopwatchHandleTouch(int x, int y) {
+    if (y >= 140 && y <= 190) {
+        if (x >= 40 && x <= 150) {
+            if (swRunning) { swElapsed += millis() - swStartMs; swRunning = false; }
+            else { swStartMs = millis(); swRunning = true; }
+            drawStopwatchScreen();
+        } else if (x >= 170 && x <= 280) {
+            swRunning = false; swElapsed = 0;
+            drawStopwatchScreen();
+        }
+    }
 }
 
 // ── Touch router ──────────────────────────────────
 void handleTouch(int x, int y) {
     if (currentScreen == SCR_HOME) {
         if (x >= 292 && y < TAB_H) { runCalibration(); redrawCurrent(); return; }
-        if (y < 40 || (y > 130 && y < 140)) return;
-        int col = (x < 160) ? 0 : 1;
-        int row = (y < 130) ? 0 : 1;
-        if (row == 0 && col == 0) switchScreen(SCR_GAME_SELECT);
-        else if (row == 0 && col == 1) switchScreen(SCR_QUIZ_SELECT);
-        else if (row == 1 && col == 0) switchScreen(SCR_NOTES_LIST);
-        else switchScreen(SCR_PICTURES);
+        if (y < 30) return;
+        for (int i = 0; i < 6; i++) {
+            HomeTile& t = homeTiles[i];
+            if (x >= t.x && x < t.x + t.w && y >= t.y && y < t.y + t.h) {
+                if (t.target == SCR_CALC) calcClear();
+                if (t.target == SCR_STOPWATCH) { swRunning = false; swElapsed = 0; }
+                switchScreen(t.target);
+                return;
+            }
+        }
         return;
     }
 
@@ -999,6 +1251,22 @@ void handleTouch(int x, int y) {
 
     if (currentScreen == SCR_PICTURES) {
         if (handleHomeTap(x, y)) return;
+        if (y >= 96 && y <= 136) {
+            if (x >= 16 && x <= 38) { picIndex = (picIndex - 1 + PIC_COUNT) % PIC_COUNT; drawPictures(); return; }
+            if (x >= SCR_W - 38 && x <= SCR_W - 16) { picIndex = (picIndex + 1) % PIC_COUNT; drawPictures(); return; }
+        }
+        return;
+    }
+
+    if (currentScreen == SCR_CALC) {
+        if (handleHomeTap(x, y)) return;
+        calcHandleTouch(x, y);
+        return;
+    }
+
+    if (currentScreen == SCR_STOPWATCH) {
+        if (handleHomeTap(x, y)) return;
+        stopwatchHandleTouch(x, y);
         return;
     }
 

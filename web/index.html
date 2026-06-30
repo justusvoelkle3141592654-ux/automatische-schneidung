@@ -126,50 +126,62 @@
 <body>
   <div class="card">
     <h1>&#127918;&#160; CYD Mini-Apps</h1>
-    <p class="subtitle">Firmware fuer das ESP32-2432S028R (Cheap Yellow Display) &ndash; Home-Menue, Spiele, Quiz, Notizen &amp; Bilder, alles offline</p>
+    <p class="subtitle">Firmware fuer das ESP32-2432S028R (Cheap Yellow Display) &ndash; Home-Menue, Spiele, Quiz, Notizen, Bilder, Rechner &amp; Stoppuhr, alles offline</p>
 
     <ul class="features">
       <li>
         <span class="icon">&#127968;</span>
         <div>
-          <div class="feat-title">Home-Menue</div>
-          <div class="feat-desc">Vier grosse Kacheln zum Start: Spiele, Quiz, Notizen, Bilder. Von dort aus gelangst du auch direkt zur Touch-Kalibrierung.</div>
+          <div class="feat-title">Home-Menue mit 6 Kacheln</div>
+          <div class="feat-desc">Spiele, Quiz, Notizen, Bilder, Rechner und Stoppuhr &ndash; alles auf einen Blick. Von dort aus gelangst du auch direkt zur Touch-Kalibrierung.</div>
         </div>
       </li>
       <li>
         <span class="icon">&#127918;</span>
         <div>
           <div class="feat-title">Spiele: Snake &amp; Flappy Bird</div>
-          <div class="feat-desc">Eine Auswahl-Seite, dann geht's los: Snake mit Fingersteuerung oder Flappy Bird per Antippen. Beide mit gespeichertem Highscore.</div>
+          <div class="feat-desc">Eine Auswahl-Seite, dann geht's los: Snake mit Fingersteuerung oder Flappy Bird per Antippen &ndash; jetzt mit fluessiger, flackerfreier Darstellung und bunterem Himmel/Boden. Beide mit gespeichertem Highscore.</div>
         </div>
       </li>
       <li>
         <span class="icon">&#10067;</span>
         <div>
           <div class="feat-title">Quiz mit 5 Kategorien</div>
-          <div class="feat-desc">3D-Druck, Technik, Allgemeinwissen, Tiere und Wissen &ndash; jede Kategorie mit eigenen Fragen, bunten Antwort-Kacheln und Punktestand.</div>
+          <div class="feat-desc">3D-Druck, Technik, Allgemeinwissen, Tiere und Wissen &ndash; jetzt in einer hochformatigen Karte mit mehr Hintergrundfarbe, bunten Antwort-Kacheln und Punktestand.</div>
         </div>
       </li>
       <li>
         <span class="icon">&#128221;</span>
         <div>
           <div class="feat-title">Notizen mit einklappbarer Tastatur</div>
-          <div class="feat-desc">Liste mit allen Notizen, Bearbeiten per Touch-Tastatur. Die Tastatur laesst sich ueber einen Knopf ein- und ausklappen, damit mehr Platz fuer den Text bleibt. Bleibt nach dem Ausschalten gespeichert.</div>
+          <div class="feat-desc">Liste mit allen Notizen, Bearbeiten per Touch-Tastatur &ndash; jetzt flackerfrei dank Doppelpufferung. Die Tastatur laesst sich ueber einen Knopf ein- und ausklappen, damit mehr Platz fuer den Text bleibt. Bleibt nach dem Ausschalten gespeichert.</div>
         </div>
       </li>
       <li>
         <span class="icon">&#128247;</span>
         <div>
-          <div class="feat-title">Bilder</div>
-          <div class="feat-desc">Eigener Bildschirm fuers Anzeigen von Bildern auf dem Display, aktuell mit einem Katzen-Platzhalterbild.</div>
+          <div class="feat-title">Bilder-Galerie</div>
+          <div class="feat-desc">Echte Fotos der Katze zum Durchblaettern mit Pfeiltasten &ndash; sechs Bilder, direkt auf dem Display.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#128290;</span>
+        <div>
+          <div class="feat-title">Rechner</div>
+          <div class="feat-desc">Einfacher Taschenrechner mit Touch-Tastenfeld fuer Grundrechenarten.</div>
+        </div>
+      </li>
+      <li>
+        <span class="icon">&#9201;</span>
+        <div>
+          <div class="feat-title">Stoppuhr</div>
+          <div class="feat-desc">Start, Stopp und Zuruecksetzen per Antippen, mit laufender Zeitanzeige.</div>
         </div>
       </li>
     </ul>
 
     <div class="install-section">
       <p>CYD per USB-Kabel an den Computer anschliessen, dann auf den Knopf druecken:</p>
-      <!-- Auf der echten Live-Seite ist dies der funktionsfaehige Flash-Knopf.
-           In dieser Offline-Vorschau wird stattdessen ein Platzhalter gezeigt. -->
       <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
       <noscript><span class="fake-btn">Auf CYD installieren</span></noscript>
     </div>
@@ -180,8 +192,8 @@
       <li>Auf <strong style="color:#00d4ff">"Auf CYD installieren"</strong> klicken</li>
       <li>Im Browser-Fenster den richtigen USB-Port auswaehlen und bestaetigen</li>
       <li>Warten bis die Installation abgeschlossen ist (~1 Minute)</li>
-      <li>CYD startet neu und zeigt das Home-Menue mit den vier Kacheln</li>
-      <li>Tippe auf <em>Spiele</em>, <em>Quiz</em>, <em>Notizen</em> oder <em>Bilder</em>, um loszulegen</li>
+      <li>CYD startet neu und zeigt das Home-Menue mit den sechs Kacheln</li>
+      <li>Tippe auf <em>Spiele</em>, <em>Quiz</em>, <em>Notizen</em>, <em>Bilder</em>, <em>Rechner</em> oder <em>Stoppuhr</em>, um loszulegen</li>
       <li>Fertig! Alles laeuft komplett offline, ganz ohne WLAN.</li>
     </ol>
 

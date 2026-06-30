@@ -1,6 +1,6 @@
 {
-  "name": "CYD Mini-Apps (Home, Spiele, Quiz, Notizen, Bilder)",
-  "version": "3.0.0",
+  "name": "CYD Mini-Apps (Home, Spiele, Quiz, Notizen, Bilder, Rechner, Stoppuhr)",
+  "version": "4.0.0",
   "builds": [
     {
       "chipFamily": "ESP32",
