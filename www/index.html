@@ -513,11 +513,15 @@ async function ensureFFmpeg(){
   const {FFmpeg}=FFmpegWASM;
   const {toBlobURL}=FFmpegUtil;
   ffmpeg=new FFmpeg();
-  const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+  const coreBase='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+  const ffmpegBase='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd';
   setProc(2,'Lade Schnitt-Engine…','Einmaliger Download – danach geht es schnell.');
+  // classWorkerURL must be same-origin (blob:), otherwise the browser refuses
+  // to construct a Worker from a cross-origin script URL.
   await ffmpeg.load({
-    coreURL: await toBlobURL(base+'/ffmpeg-core.js','text/javascript'),
-    wasmURL: await toBlobURL(base+'/ffmpeg-core.wasm','application/wasm'),
+    coreURL: await toBlobURL(coreBase+'/ffmpeg-core.js','text/javascript'),
+    wasmURL: await toBlobURL(coreBase+'/ffmpeg-core.wasm','application/wasm'),
+    classWorkerURL: await toBlobURL(ffmpegBase+'/814.ffmpeg.js','text/javascript'),
   });
   ffmpegLoaded=true;
 }
