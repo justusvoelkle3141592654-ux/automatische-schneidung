@@ -1,0 +1,14 @@
+{
+  "name": "schnittwerk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automatische Video-Schneidung - native Android App",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1"
+  }
+}

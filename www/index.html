@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+<meta name="theme-color" content="#0b0b12"/>
+<title>Schnittwerk</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+
+:root{
+  --bg:#0b0b12;
+  --surface:#15151f;
+  --surface-2:#1c1c29;
+  --surface-3:#242433;
+  --outline:rgba(255,255,255,0.08);
+  --outline-strong:rgba(255,255,255,0.16);
+  --accent:#a855f7;
+  --accent-2:#ec4899;
+  --accent-grad:linear-gradient(135deg,#a855f7,#ec4899);
+  --text:#f5f4fb;
+  --text-dim:rgba(245,244,251,0.58);
+  --text-faint:rgba(245,244,251,0.32);
+  --danger:#f87171;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+
+body{
+  font-family:Roboto,-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  -webkit-user-select:none;user-select:none;
+  display:flex;flex-direction:column;
+}
+
+input,textarea{-webkit-user-select:text;user-select:text}
+
+/* ── App bar ── */
+.appbar{
+  display:flex;align-items:center;gap:12px;
+  padding:calc(14px + var(--safe-top)) 16px 14px;
+  flex-shrink:0;position:relative;z-index:5;
+  background:var(--bg);
+}
+.appbar-back{
+  width:36px;height:36px;border-radius:50%;border:none;background:transparent;
+  color:var(--text-dim);display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:background .15s;
+}
+.appbar-back:active{background:var(--surface-2)}
+.appbar-back.hidden-slot{visibility:hidden;pointer-events:none}
+.appbar-title{font-size:17px;font-weight:700;letter-spacing:-0.2px;flex:1}
+.appbar-mark{width:30px;height:30px;border-radius:9px;background:var(--accent-grad);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ── Progress rail ── */
+.rail{display:flex;gap:5px;padding:0 16px 16px;flex-shrink:0}
+.rail-seg{flex:1;height:3px;border-radius:99px;background:var(--outline)}
+.rail-seg.on{background:var(--accent-grad)}
+
+/* ── Scroll body ── */
+.body{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.page{display:none;padding:4px 16px 24px;min-height:100%}
+.page.active{display:block}
+
+.head{margin-bottom:22px}
+.head h1{font-size:23px;font-weight:800;letter-spacing:-0.4px;line-height:1.25;margin-bottom:6px}
+.head p{font-size:14px;color:var(--text-dim);line-height:1.55}
+
+/* ── Drop zone ── */
+.dropzone{
+  border:1.5px dashed var(--outline-strong);border-radius:20px;
+  background:var(--surface);padding:40px 20px;text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+  transition:background .15s,border-color .15s;
+}
+.dropzone:active{background:var(--surface-2);border-color:var(--accent)}
+.dz-icon{
+  width:52px;height:52px;border-radius:16px;
+  background:rgba(168,85,247,0.14);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+}
+.dz-title{font-size:16px;font-weight:700}
+.dz-sub{font-size:13px;color:var(--text-dim)}
+.dz-sub b{color:var(--accent);font-weight:600}
+
+/* ── Video list ── */
+.vlist{margin-top:18px;display:flex;flex-direction:column;gap:8px}
+.vrow{
+  display:flex;align-items:center;gap:12px;
+  background:var(--surface);border:1px solid var(--outline);border-radius:14px;
+  padding:8px;transition:background .15s;
+}
+.vrow:active{background:var(--surface-2)}
+.vthumb-wrap{position:relative;width:64px;height:48px;border-radius:9px;overflow:hidden;flex-shrink:0;background:var(--surface-3)}
+.vthumb{width:100%;height:100%;object-fit:cover;display:block}
+.vthumb-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-faint)}
+.vdur{position:absolute;bottom:2px;right:3px;background:rgba(0,0,0,0.72);color:#fff;
+  font-size:9px;font-weight:600;padding:1px 4px;border-radius:4px;line-height:1.4}
+.vmeta{flex:1;min-width:0}
+.vname{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vsize{font-size:11.5px;color:var(--text-faint);margin-top:2px}
+.vdel{
+  width:34px;height:34px;border-radius:10px;border:none;background:transparent;
+  color:var(--text-faint);display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.vdel:active{background:rgba(248,113,113,0.12);color:var(--danger)}
+
+.count-pill{
+  display:inline-flex;align-items:center;gap:6px;margin-top:16px;
+  padding:6px 12px;border-radius:99px;background:var(--surface);border:1px solid var(--outline);
+  font-size:12.5px;color:var(--text-dim);font-weight:500;
+}
+.count-pill b{color:var(--text)}
+
+/* ── Preset cards ── */
+.pgrid{display:flex;flex-direction:column;gap:10px}
+.pcard{
+  display:flex;align-items:center;gap:14px;
+  background:var(--surface);border:1.5px solid var(--outline);border-radius:16px;
+  padding:14px;position:relative;transition:border-color .15s,background .15s;
+}
+.pcard:active{background:var(--surface-2)}
+.pcard.selected{border-color:var(--accent);background:linear-gradient(135deg,rgba(168,85,247,0.1),rgba(236,72,153,0.06))}
+.pswatch{width:46px;height:46px;border-radius:12px;flex-shrink:0;position:relative;overflow:hidden}
+.pswatch svg{position:absolute;inset:0;margin:auto}
+.ps-cinematic{background:linear-gradient(135deg,#1a1a3e,#2d1b4e)}
+.ps-energetisch{background:linear-gradient(135deg,#c2410c,#f97316)}
+.ps-vintage{background:linear-gradient(135deg,#78350f,#d97706)}
+.ps-modern{background:linear-gradient(135deg,#0e7490,#155e75)}
+.ps-dramatisch{background:linear-gradient(135deg,#18181b,#3f0d0d)}
+.ps-warm{background:linear-gradient(135deg,#92400e,#f59e0b)}
+.pinfo{flex:1;min-width:0}
+.pname{display:block;font-size:15px;font-weight:700;margin-bottom:2px}
+.pdesc{display:block;font-size:12.5px;color:var(--text-dim);line-height:1.4}
+.pradio{
+  width:22px;height:22px;border-radius:50%;border:2px solid var(--outline-strong);
+  flex-shrink:0;position:relative;transition:border-color .15s;
+}
+.pcard.selected .pradio{border-color:var(--accent)}
+.pcard.selected .pradio::after{
+  content:'';position:absolute;inset:3px;border-radius:50%;background:var(--accent-grad);
+}
+
+/* ── Bottom action bar ── */
+.actionbar{
+  flex-shrink:0;padding:12px 16px calc(12px + var(--safe-bottom));
+  background:var(--bg);border-top:1px solid var(--outline);
+  display:flex;gap:10px;
+}
+.btn{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+  height:50px;border-radius:14px;border:none;font-size:15px;font-weight:700;
+  font-family:inherit;transition:transform .1s,opacity .1s;cursor:pointer;
+}
+.btn:active{transform:scale(0.97)}
+.btn:disabled{opacity:0.35;pointer-events:none}
+.btn-primary{background:var(--accent-grad);color:#fff}
+.btn-secondary{background:var(--surface-2);color:var(--text);flex:0 0 50px;width:50px}
+.btn svg{width:19px;height:19px;flex-shrink:0}
+
+/* ── Processing page ── */
+.proc{display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:12vh;gap:22px}
+.proc-ring-wrap{width:76px;height:76px;position:relative}
+.proc-ring{position:absolute;inset:0;border:3px solid rgba(168,85,247,0.15);border-top-color:var(--accent);border-radius:50%;animation:spin .85s linear infinite}
+.proc-ring2{position:absolute;inset:11px;border:2.5px solid rgba(236,72,153,0.15);border-bottom-color:var(--accent-2);border-radius:50%;animation:spin .6s linear infinite reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+.proc-title{font-size:19px;font-weight:800}
+.proc-msg{font-size:13.5px;color:var(--text-dim);margin-top:4px;max-width:280px}
+.pbar-track{width:100%;max-width:280px;height:5px;background:var(--surface-2);border-radius:99px;overflow:hidden}
+.pbar-fill{height:100%;background:var(--accent-grad);border-radius:99px;width:0;transition:width .4s ease}
+.pbar-pct{font-size:12.5px;color:var(--text-faint);font-weight:600;margin-top:6px}
+.proc-strip{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:280px;margin-top:6px}
+.proc-chip{width:32px;height:24px;border-radius:5px;background:var(--surface-2);border:1px solid var(--outline);overflow:hidden;transition:.35s}
+.proc-chip.on{border-color:var(--accent)}
+.proc-chip img{width:100%;height:100%;object-fit:cover;display:block;opacity:0.55}
+.proc-chip.on img{opacity:1}
+
+/* ── Done page ── */
+.done{display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:8vh;gap:14px}
+.done-icon{width:72px;height:72px;border-radius:50%;background:rgba(168,85,247,0.12);
+  border:2px solid rgba(168,85,247,0.35);display:flex;align-items:center;justify-content:center;
+  animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}
+.done-title{font-size:22px;font-weight:800}
+.done-sub{font-size:13.5px;color:var(--text-dim);max-width:280px;line-height:1.55}
+.done-video{width:100%;max-width:340px;border-radius:16px;background:#000;margin-top:6px}
+
+/* ── Error banner ── */
+.errbox{
+  margin-top:16px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);
+  border-radius:14px;padding:14px;font-size:13px;color:#ffb4b4;line-height:1.6;display:none;
+}
+.errbox.show{display:block}
+
+.hidden{display:none!important}
+
+@media(min-width:520px){
+  .body{display:flex;justify-content:center}
+  .page{max-width:480px;width:100%}
+  .appbar,.rail,.actionbar{max-width:480px;width:100%;margin:0 auto}
+}
+</style>
+</head>
+<body>
+
+<div class="appbar">
+  <button class="appbar-back hidden-slot" id="back-btn" aria-label="Zurück">
+    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12.5 4l-6 6 6 6"/></svg>
+  </button>
+  <div class="appbar-mark"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M2.5 3.5h2.5v9H2.5zM7 3.5h2.5v9H7zM12 3.5l3 4.5-3 4.5v-9z" fill="#fff"/></svg></div>
+  <div class="appbar-title" id="appbar-title">Videos wählen</div>
+</div>
+
+<div class="rail">
+  <div class="rail-seg on" id="rail1"></div>
+  <div class="rail-seg" id="rail2"></div>
+  <div class="rail-seg" id="rail3"></div>
+</div>
+
+<div class="body" id="scroll-body">
+
+  <!-- Page 1: Upload -->
+  <section id="p-upload" class="page active">
+    <div class="head">
+      <h1>Videos auswählen</h1>
+      <p>Bis zu 20 Videos · wird direkt auf deinem Gerät geschnitten, nichts wird hochgeladen.</p>
+    </div>
+
+    <input type="file" id="file-input" accept="video/*" multiple hidden/>
+
+    <div id="dropzone" class="dropzone">
+      <div class="dz-icon">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M8 9l4-5 4 5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      </div>
+      <div class="dz-title">Videos hinzufügen</div>
+      <div class="dz-sub">Tippen zum <b>Auswählen aus der Galerie</b></div>
+    </div>
+
+    <div id="vlist" class="vlist"></div>
+    <div id="count-pill" class="count-pill hidden"></div>
+    <div id="err-upload" class="errbox"></div>
+  </section>
+
+  <!-- Page 2: Style -->
+  <section id="p-style" class="page">
+    <div class="head">
+      <h1>Stil wählen</h1>
+      <p>Farbe, Schnitttempo und Übergänge werden automatisch passend gesetzt.</p>
+    </div>
+    <div class="pgrid" id="pgrid">
+      <div class="pcard selected" data-p="cinematic">
+        <div class="pswatch ps-cinematic"></div>
+        <div class="pinfo"><span class="pname">Cinematisch</span><span class="pdesc">Kühler Look, sanfte Blenden</span></div>
+        <div class="pradio"></div>
+      </div>
+      <div class="pcard" data-p="energetisch">
+        <div class="pswatch ps-energetisch"></div>
+        <div class="pinfo"><span class="pname">Energetisch</span><span class="pdesc">Schnell, satte Farben</span></div>
+        <div class="pradio"></div>
+      </div>
+      <div class="pcard" data-p="vintage">
+        <div class="pswatch ps-vintage"></div>
+        <div class="pinfo"><span class="pname">Vintage</span><span class="pdesc">Warme Retro-Töne</span></div>
+        <div class="pradio"></div>
+      </div>
+      <div class="pcard" data-p="modern">
+        <div class="pswatch ps-modern"></div>
+        <div class="pinfo"><span class="pname">Modern</span><span class="pdesc">Klar und sauber</span></div>
+        <div class="pradio"></div>
+      </div>
+      <div class="pcard" data-p="dramatisch">
+        <div class="pswatch ps-dramatisch"></div>
+        <div class="pinfo"><span class="pname">Dramatisch</span><span class="pdesc">Hoher Kontrast, dunkel</span></div>
+        <div class="pradio"></div>
+      </div>
+      <div class="pcard" data-p="warm">
+        <div class="pswatch ps-warm"></div>
+        <div class="pinfo"><span class="pname">Warm & Golden</span><span class="pdesc">Goldener Farbton</span></div>
+        <div class="pradio"></div>
+      </div>
+    </div>
+    <div id="err-style" class="errbox"></div>
+  </section>
+
+  <!-- Page 3: Processing -->
+  <section id="p-proc" class="page">
+    <div class="proc">
+      <div class="proc-ring-wrap"><div class="proc-ring"></div><div class="proc-ring2"></div></div>
+      <div>
+        <div class="proc-title" id="proc-title">Bereite vor…</div>
+        <div class="proc-msg" id="proc-msg">Starte…</div>
+      </div>
+      <div style="width:100%;display:flex;flex-direction:column;align-items:center">
+        <div class="pbar-track"><div id="pbar" class="pbar-fill"></div></div>
+        <div class="pbar-pct" id="pbar-pct">0%</div>
+      </div>
+      <div id="proc-strip" class="proc-strip"></div>
+    </div>
+  </section>
+
+  <!-- Page 4: Done -->
+  <section id="p-done" class="page">
+    <div class="done">
+      <div class="done-icon">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M7 16l6 6 12-12" stroke="url(#dg)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="dg" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stop-color="#a855f7"/><stop offset="100%" stop-color="#ec4899"/></linearGradient></defs></svg>
+      </div>
+      <div class="done-title">Video ist fertig!</div>
+      <div class="done-sub">Alle Clips wurden automatisch geschnitten und zusammengefügt.</div>
+      <video id="done-video" class="done-video" controls playsinline></video>
+    </div>
+  </section>
+
+</div>
+
+<div class="actionbar" id="actionbar">
+  <button id="main-btn" class="btn btn-primary" disabled>
+    <span id="main-btn-label">Weiter</span>
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+  </button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+
+const PRESETS={
+  cinematic:  {color:'eq=brightness=-0.05:contrast=1.3:saturation=0.75,colorbalance=rs=-0.05:gs=-0.02:bs=0.1', dur:6,   speed:1.0,  fade:0.5},
+  energetisch:{color:'eq=brightness=0.05:contrast=1.15:saturation=1.6',                                       dur:3.5, speed:1.25, fade:0.35},
+  vintage:    {color:'eq=brightness=0.05:contrast=0.9:saturation=0.55,colorbalance=rs=0.12:gs=0.04:bs=-0.08',  dur:7,   speed:0.95, fade:0.6},
+  modern:     {color:'eq=contrast=1.05:saturation=1.1',                                                        dur:5,   speed:1.0,  fade:0.45},
+  dramatisch: {color:'eq=brightness=-0.12:contrast=1.6:saturation=0.35',                                       dur:6,   speed:1.0,  fade:0.5},
+  warm:       {color:'colorbalance=rs=0.15:gs=0.05:bs=-0.12,eq=saturation=1.2:contrast=1.05',                  dur:6,   speed:1.0,  fade:0.55},
+};
+
+const pages=['p-upload','p-style','p-proc','p-done'];
+const titles=['Videos wählen','Stil wählen','Schneide Video…','Fertig'];
+let pageIdx=0;
+let clips=[];
+let selectedPreset='cinematic';
+let ffmpeg=null, ffmpegLoaded=false;
+
+function renderPage(){
+  pages.forEach((id,i)=>$(id).classList.toggle('active', i===pageIdx));
+  $('appbar-title').textContent=titles[pageIdx];
+  [1,2,3].forEach(n=>$('rail'+n).classList.toggle('on', n-1<=pageIdx));
+  $('back-btn').classList.toggle('hidden-slot', pageIdx===0 || pageIdx>=2);
+  $('scroll-body').scrollTop=0;
+
+  const bar=$('actionbar');
+  const btn=$('main-btn');
+  const lbl=$('main-btn-label');
+  if(pageIdx===0){
+    bar.classList.remove('hidden');
+    btn.disabled=clips.length===0;
+    lbl.textContent='Weiter zum Stil';
+    btn.onclick=()=>goTo(1);
+  } else if(pageIdx===1){
+    bar.classList.remove('hidden');
+    btn.disabled=false;
+    lbl.textContent='Automatisch schneiden';
+    btn.onclick=startProcessing;
+  } else if(pageIdx===2){
+    bar.classList.add('hidden');
+  } else {
+    bar.classList.remove('hidden');
+    btn.disabled=false;
+    lbl.textContent='Neues Video erstellen';
+    btn.onclick=resetAll;
+  }
+}
+
+function goTo(i){ pageIdx=i; renderPage(); }
+$('back-btn').addEventListener('click',()=>{ if(pageIdx>0) goTo(pageIdx-1); });
+
+function resetAll(){
+  clips=[];
+  $('vlist').innerHTML='';
+  $('count-pill').classList.add('hidden');
+  $('err-upload').classList.remove('show');
+  $('err-style').classList.remove('show');
+  $('proc-strip').innerHTML='';
+  goTo(0);
+}
+
+// ── Upload ──
+const dz=$('dropzone'), fi=$('file-input');
+dz.addEventListener('click',()=>fi.click());
+fi.addEventListener('change',e=>{ addFiles([...e.target.files]); fi.value=''; });
+
+async function addFiles(files){
+  if(!files.length)return;
+  $('err-upload').classList.remove('show');
+  const room=20-clips.length;
+  if(files.length>room){
+    showErr('err-upload', room<=0 ? 'Du hast bereits 20 Videos ausgewählt (Maximum).' : `Nur ${room} weitere Videos möglich – der Rest wurde ignoriert.`);
+    files=files.slice(0,Math.max(0,room));
+  }
+  for(const f of files){
+    const entry={file:f,thumb:null,duration:0};
+    clips.push(entry);
+    renderList();
+    try{
+      const meta=await makeThumb(f);
+      entry.thumb=meta.thumb; entry.duration=meta.duration;
+    }catch(e){ /* keep placeholder */ }
+    renderList();
+  }
+}
+
+function showErr(id,msg){ const el=$(id); el.textContent=msg; el.classList.add('show'); }
+
+function makeThumb(file){
+  return new Promise((resolve)=>{
+    const v=document.createElement('video');
+    v.preload='metadata'; v.muted=true; v.playsInline=true;
+    const url=URL.createObjectURL(file);
+    let settled=false;
+    const finish=(result)=>{ if(settled)return; settled=true; URL.revokeObjectURL(url); resolve(result); };
+    v.onloadedmetadata=()=>{
+      const dur=v.duration&&isFinite(v.duration)?v.duration:0;
+      const seekTo=Math.min(dur*0.1||0,1);
+      v.onseeked=()=>{
+        try{
+          const c=document.createElement('canvas');
+          c.width=160; c.height=90;
+          c.getContext('2d').drawImage(v,0,0,160,90);
+          finish({thumb:c.toDataURL('image/jpeg',0.7),duration:dur});
+        }catch(e){ finish({thumb:null,duration:dur}); }
+      };
+      try{ v.currentTime=seekTo; }catch(e){ finish({thumb:null,duration:dur}); }
+      setTimeout(()=>finish({thumb:null,duration:dur}),2500);
+    };
+    v.onerror=()=>finish({thumb:null,duration:0});
+    v.src=url;
+    setTimeout(()=>finish({thumb:null,duration:0}),8000);
+  });
+}
+
+function fmtDur(s){
+  if(!s||!isFinite(s))return '';
+  const m=Math.floor(s/60), sec=Math.round(s%60);
+  return m+':'+String(sec).padStart(2,'0');
+}
+function fmtSize(bytes){
+  if(bytes>1024*1024)return (bytes/1024/1024).toFixed(1)+' MB';
+  return Math.round(bytes/1024)+' KB';
+}
+
+function renderList(){
+  const list=$('vlist');
+  list.innerHTML='';
+  clips.forEach((c,i)=>{
+    const row=document.createElement('div'); row.className='vrow';
+    const tw=document.createElement('div'); tw.className='vthumb-wrap';
+    if(c.thumb){
+      const img=document.createElement('img'); img.className='vthumb'; img.src=c.thumb;
+      tw.appendChild(img);
+    }else{
+      const ph=document.createElement('div'); ph.className='vthumb-ph';
+      ph.innerHTML='<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="1" y="3.5" width="18" height="13" rx="2"/><path d="M8 7.5l5 2.5-5 2.5v-5z"/></svg>';
+      tw.appendChild(ph);
+    }
+    if(c.duration){
+      const d=document.createElement('div'); d.className='vdur'; d.textContent=fmtDur(c.duration);
+      tw.appendChild(d);
+    }
+    row.appendChild(tw);
+    const meta=document.createElement('div'); meta.className='vmeta';
+    const nm=document.createElement('div'); nm.className='vname'; nm.textContent=c.file.name;
+    const sz=document.createElement('div'); sz.className='vsize'; sz.textContent=fmtSize(c.file.size);
+    meta.appendChild(nm); meta.appendChild(sz);
+    row.appendChild(meta);
+    const del=document.createElement('button'); del.className='vdel';
+    del.innerHTML='<svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l9 9M13 4l-9 9"/></svg>';
+    del.onclick=()=>{ clips.splice(i,1); renderList(); renderPage(); };
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+  const pill=$('count-pill');
+  if(clips.length){
+    pill.classList.remove('hidden');
+    pill.innerHTML=`<b>${clips.length}</b> von 20 Videos ausgewählt`;
+  }else{
+    pill.classList.add('hidden');
+  }
+  renderPage();
+}
+
+// ── Preset selection ──
+document.querySelectorAll('.pcard').forEach(c=>c.addEventListener('click',()=>{
+  document.querySelectorAll('.pcard').forEach(x=>x.classList.remove('selected'));
+  c.classList.add('selected');
+  selectedPreset=c.dataset.p;
+}));
+
+// ── FFmpeg processing ──
+function setProc(pct,title,msg){
+  $('pbar').style.width=Math.round(pct)+'%';
+  $('pbar-pct').textContent=Math.round(pct)+'%';
+  if(title)$('proc-title').textContent=title;
+  if(msg!==undefined)$('proc-msg').textContent=msg;
+}
+
+async function ensureFFmpeg(){
+  if(ffmpegLoaded)return;
+  if(typeof FFmpegWASM==='undefined'||typeof FFmpegUtil==='undefined')
+    throw new Error('Die Schnitt-Engine konnte nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.');
+  const {FFmpeg}=FFmpegWASM;
+  const {toBlobURL}=FFmpegUtil;
+  ffmpeg=new FFmpeg();
+  const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+  setProc(2,'Lade Schnitt-Engine…','Einmaliger Download – danach geht es schnell.');
+  await ffmpeg.load({
+    coreURL: await toBlobURL(base+'/ffmpeg-core.js','text/javascript'),
+    wasmURL: await toBlobURL(base+'/ffmpeg-core.wasm','application/wasm'),
+  });
+  ffmpegLoaded=true;
+}
+
+async function probeAudio(name){
+  let log='';
+  const onLog=({message})=>{log+=message+'\n';};
+  ffmpeg.on('log',onLog);
+  try{await ffmpeg.exec(['-i',name]);}catch(e){/* expected nonzero */}
+  ffmpeg.off('log',onLog);
+  return /Audio:/.test(log);
+}
+
+function buildArgs(inName,outName,preset,srcDur,hasAudio){
+  const speed=preset.speed;
+  const outDur=srcDur/speed;
+  const fadeF=Math.max(1,Math.round(preset.fade*30));
+  const foStart=Math.max(0,Math.round((outDur-preset.fade)*30));
+  let vf='scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1';
+  if(speed!==1)vf+=`,setpts=${(1/speed).toFixed(4)}*PTS`;
+  vf+=','+preset.color;
+  vf+=`,fade=in:0:${fadeF},fade=out:${foStart}:${fadeF}`;
+  const a=['-t',srcDur.toFixed(3),'-i',inName];
+  if(!hasAudio)a.push('-f','lavfi','-i','anullsrc=r=44100:cl=stereo');
+  a.push('-vf',vf);
+  if(hasAudio){
+    let af='';
+    if(speed!==1)af+=`atempo=${speed.toFixed(4)},`;
+    af+=`afade=in:st=0:d=${preset.fade},afade=out:st=${Math.max(0,outDur-preset.fade).toFixed(3)}:d=${preset.fade}`;
+    a.push('-af',af);
+  }else{
+    a.push('-map','0:v:0','-map','1:a:0','-shortest');
+  }
+  a.push('-r','30','-c:v','libx264','-preset','ultrafast','-crf','28','-pix_fmt','yuv420p',
+         '-c:a','aac','-ar','44100','-ac','2',outName);
+  return a;
+}
+
+function buildStrip(){
+  const w=$('proc-strip'); w.innerHTML='';
+  clips.forEach((c,i)=>{
+    const d=document.createElement('div'); d.className='proc-chip'; d.id='chip-'+i;
+    if(c.thumb){ const img=document.createElement('img'); img.src=c.thumb; d.appendChild(img); }
+    w.appendChild(d);
+  });
+}
+
+async function startProcessing(){
+  if(!clips.length)return;
+  $('err-style').classList.remove('show');
+  buildStrip();
+  goTo(2);
+  setProc(0,'Bereite vor…','Starte…');
+  const preset=PRESETS[selectedPreset];
+
+  try{
+    await ensureFFmpeg();
+
+    let curBase=0, curSpan=0;
+    const onProg=({progress})=>{ if(progress>=0&&progress<=1)setProc(curBase+progress*curSpan); };
+    ffmpeg.on('progress',onProg);
+
+    const parts=[];
+    const N=clips.length;
+    const span=80;
+    for(let i=0;i<N;i++){
+      const c=clips[i];
+      const inName='in'+i+'.mp4', outName='part'+i+'.mp4';
+      $('chip-'+i)?.classList.add('on');
+      curBase=5+(i/N)*span; curSpan=(1/N)*span;
+      setProc(curBase,'Schneide Clips…',`Clip ${i+1} von ${N}`);
+
+      await ffmpeg.writeFile(inName,new Uint8Array(await c.file.arrayBuffer()));
+      const hasAudio=await probeAudio(inName);
+      const srcDur=Math.min(preset.dur,(c.duration&&c.duration>0)?c.duration:preset.dur);
+      await ffmpeg.exec(buildArgs(inName,outName,preset,srcDur,hasAudio));
+      await ffmpeg.deleteFile(inName).catch(()=>{});
+      parts.push(outName);
+    }
+
+    setProc(86,'Füge alles zusammen…','Verbinde '+N+' Clips');
+    curBase=86; curSpan=12;
+    let outData;
+    if(parts.length===1){
+      outData=await ffmpeg.readFile(parts[0]);
+    }else{
+      const list=parts.map(p=>`file '${p}'`).join('\n');
+      await ffmpeg.writeFile('list.txt',list);
+      try{
+        await ffmpeg.exec(['-f','concat','-safe','0','-i','list.txt','-c','copy','out.mp4']);
+        outData=await ffmpeg.readFile('out.mp4');
+      }catch(e){
+        await ffmpeg.exec(['-f','concat','-safe','0','-i','list.txt',
+          '-c:v','libx264','-preset','ultrafast','-crf','28','-pix_fmt','yuv420p',
+          '-c:a','aac','-ar','44100','-ac','2','out.mp4']);
+        outData=await ffmpeg.readFile('out.mp4');
+      }
+    }
+    ffmpeg.off('progress',onProg);
+
+    for(const p of parts){await ffmpeg.deleteFile(p).catch(()=>{});}
+    await ffmpeg.deleteFile('list.txt').catch(()=>{});
+    await ffmpeg.deleteFile('out.mp4').catch(()=>{});
+
+    setProc(100,'Fertig!','');
+    const blob=new Blob([outData.buffer],{type:'video/mp4'});
+    const url=URL.createObjectURL(blob);
+    $('done-video').src=url;
+    setTimeout(()=>goTo(3),300);
+
+  }catch(err){
+    console.error(err);
+    showErr('err-style','Es ist ein Fehler aufgetreten: '+(err&&err.message?err.message:err)+
+      ' Tipp: Internetverbindung prüfen. Bei sehr großen oder vielen Videos kann der Speicher ausgehen — dann weniger oder kürzere Clips probieren.');
+    goTo(1);
+  }
+}
+
+renderPage();
+</script>
+</body>
+</html>

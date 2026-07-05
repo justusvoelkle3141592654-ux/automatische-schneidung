@@ -4,3 +4,17 @@ uploads/
 output/
 *.egg-info/
 .env
+
+# Node
+node_modules/
+
+# Android build outputs
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/.idea/
+android/app/release/
+*.apk
+*.aab

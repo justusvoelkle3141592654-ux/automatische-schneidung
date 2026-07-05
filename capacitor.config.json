@@ -1,0 +1,11 @@
+{
+  "appId": "de.schnittwerk.app",
+  "appName": "Schnittwerk",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
