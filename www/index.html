@@ -226,7 +226,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   <section id="p-upload" class="page active">
     <div class="head">
       <h1>Videos auswählen</h1>
-      <p>Bis zu 20 Videos · wird direkt auf deinem Gerät geschnitten, nichts wird hochgeladen.</p>
+      <p>Bis zu 20 Videos · alles läuft offline direkt auf deinem Gerät, nichts wird hochgeladen.</p>
     </div>
 
     <input type="file" id="file-input" accept="video/*" multiple hidden/>
@@ -322,8 +322,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   </button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script src="vendor/util.js"></script>
+<script src="vendor/ffmpeg.js"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -509,15 +509,16 @@ function setProc(pct,title,msg){
 async function ensureFFmpeg(){
   if(ffmpegLoaded)return;
   if(typeof FFmpegWASM==='undefined'||typeof FFmpegUtil==='undefined')
-    throw new Error('Die Schnitt-Engine konnte nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.');
+    throw new Error('Die Schnitt-Engine konnte nicht geladen werden. Bitte starte die App neu.');
   const {FFmpeg}=FFmpegWASM;
   const {toBlobURL}=FFmpegUtil;
   ffmpeg=new FFmpeg();
-  const coreBase='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
-  const ffmpegBase='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd';
-  setProc(2,'Lade Schnitt-Engine…','Einmaliger Download – danach geht es schnell.');
-  // classWorkerURL must be same-origin (blob:), otherwise the browser refuses
-  // to construct a Worker from a cross-origin script URL.
+  // All engine files are bundled inside the app (vendor/) so it works fully
+  // offline – no internet needed.
+  const coreBase='vendor/core';
+  const ffmpegBase='vendor';
+  setProc(2,'Lade Schnitt-Engine…','Einen Moment…');
+  // Load everything through blob: URLs so the Worker/core share the page origin.
   await ffmpeg.load({
     coreURL: await toBlobURL(coreBase+'/ffmpeg-core.js','text/javascript'),
     wasmURL: await toBlobURL(coreBase+'/ffmpeg-core.wasm','application/wasm'),
@@ -635,7 +636,7 @@ async function startProcessing(){
   }catch(err){
     console.error(err);
     showErr('err-style','Es ist ein Fehler aufgetreten: '+(err&&err.message?err.message:err)+
-      ' Tipp: Internetverbindung prüfen. Bei sehr großen oder vielen Videos kann der Speicher ausgehen — dann weniger oder kürzere Clips probieren.');
+      ' Tipp: Bei sehr großen oder vielen Videos kann der Speicher ausgehen — dann weniger oder kürzere Clips probieren.');
     goTo(1);
   }
 }
