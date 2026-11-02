@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:fitsSystemWindows="true">
+    <TextView android:id="@+id/txtStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="12dp" android:text="Nicht verbunden" android:textAppearance="?attr/textAppearanceBodyMedium"/>
+    <com.google.android.material.tabs.TabLayout android:id="@+id/tabs" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+    <ScrollView android:id="@+id/pageRemote" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="Ein/Aus" android:tag="KEY_POWER"/>
+                <Button style="@style/Key" android:id="@+id/btnWol" android:text="Einschalten (WoL)"/>
+            </LinearLayout>
+            <TextView style="@style/Heading" android:text="Lautstärke / Programm"/>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="Laut +" android:tag="KEY_VOLUP"/>
+                <Button style="@style/Key" android:text="Stumm" android:tag="KEY_MUTE"/>
+                <Button style="@style/Key" android:text="Prog +" android:tag="KEY_CHUP"/>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="Laut −" android:tag="KEY_VOLDOWN"/>
+                <Button style="@style/Key" android:text="Senderliste" android:tag="KEY_CH_LIST"/>
+                <Button style="@style/Key" android:text="Prog −" android:tag="KEY_CHDOWN"/>
+            </LinearLayout>
+            <TextView style="@style/Heading" android:text="Navigation"/>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="Home" android:tag="KEY_HOME"/>
+                <Button style="@style/Key" android:text="Hoch" android:tag="KEY_UP"/>
+                <Button style="@style/Key" android:text="Menü" android:tag="KEY_MENU"/>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="Links" android:tag="KEY_LEFT"/>
+                <Button style="@style/Key" android:text="OK" android:tag="KEY_ENTER"/>
+                <Button style="@style/Key" android:text="Rechts" android:tag="KEY_RIGHT"/>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="Zurück" android:tag="KEY_RETURN"/>
+                <Button style="@style/Key" android:text="Runter" android:tag="KEY_DOWN"/>
+                <Button style="@style/Key" android:text="Info" android:tag="KEY_INFO"/>
+            </LinearLayout>
+            <TextView style="@style/Heading" android:text="Ziffern"/>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="1" android:tag="KEY_1"/>
+                <Button style="@style/Key" android:text="2" android:tag="KEY_2"/>
+                <Button style="@style/Key" android:text="3" android:tag="KEY_3"/>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="4" android:tag="KEY_4"/>
+                <Button style="@style/Key" android:text="5" android:tag="KEY_5"/>
+                <Button style="@style/Key" android:text="6" android:tag="KEY_6"/>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="7" android:tag="KEY_7"/>
+                <Button style="@style/Key" android:text="8" android:tag="KEY_8"/>
+                <Button style="@style/Key" android:text="9" android:tag="KEY_9"/>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Space style="@style/Key"/>
+                <Button style="@style/Key" android:text="0" android:tag="KEY_0"/>
+                <Space style="@style/Key"/>
+            </LinearLayout>
+            <TextView style="@style/Heading" android:text="Quelle"/>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="Source" android:tag="KEY_SOURCE"/>
+                <Button style="@style/Key" android:text="HDMI" android:tag="KEY_HDMI"/>
+                <Button style="@style/Key" android:text="TV" android:tag="KEY_TV"/>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="HDMI 1" android:tag="KEY_HDMI1"/>
+                <Button style="@style/Key" android:text="HDMI 2" android:tag="KEY_HDMI2"/>
+                <Button style="@style/Key" android:text="HDMI 3" android:tag="KEY_HDMI3"/>
+                <Button style="@style/Key" android:text="HDMI 4" android:tag="KEY_HDMI4"/>
+            </LinearLayout>
+            <TextView style="@style/Hint" android:text="HDMI 1–4: laut einer Quelle nicht auf allen Modellen wirksam. „HDMI“ wechselt der Reihe nach durch die Eingänge."/>
+            <TextView style="@style/Heading" android:text="Wiedergabe"/>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="⏪" android:tag="KEY_REWIND"/>
+                <Button style="@style/Key" android:text="▶" android:tag="KEY_PLAY"/>
+                <Button style="@style/Key" android:text="⏸" android:tag="KEY_PAUSE"/>
+                <Button style="@style/Key" android:text="⏹" android:tag="KEY_STOP"/>
+                <Button style="@style/Key" android:text="⏩" android:tag="KEY_FF"/>
+            </LinearLayout>
+            <TextView style="@style/Heading" android:text="Farbtasten"/>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:text="Rot" android:tag="KEY_RED"/>
+                <Button style="@style/Key" android:text="Grün" android:tag="KEY_GREEN"/>
+                <Button style="@style/Key" android:text="Gelb" android:tag="KEY_YELLOW"/>
+                <Button style="@style/Key" android:text="Blau" android:tag="KEY_BLUE"/>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+    <ScrollView android:id="@+id/pageApps" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:visibility="gone">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
+            <TextView style="@style/Heading" android:text="Apps"/>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:id="@+id/btnLoadApps" android:text="App-Liste vom Fernseher laden"/>
+            </LinearLayout>
+            <TextView style="@style/Hint" android:id="@+id/txtAppsHint" android:text="Die Liste wird vom Fernseher abgefragt. Laut samsungtvws liefern nicht alle Modelle diese Liste."/>
+            <LinearLayout android:id="@+id/appList" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
+            <TextView style="@style/Heading" android:text="App per ID starten"/>
+            <LinearLayout style="@style/Row">
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:hint="App-ID" style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/editAppId" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="text"/>
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:id="@+id/btnAppWs" android:text="Starten (WebSocket)"/>
+                <Button style="@style/Key" android:id="@+id/btnAppRest" android:text="Starten (REST)"/>
+            </LinearLayout>
+            <TextView style="@style/Heading" android:text="Texteingabe"/>
+            <TextView style="@style/Hint" android:id="@+id/txtIme" android:text="Erst am Fernseher ein Textfeld öffnen (z. B. Suche), dann hier tippen und senden."/>
+            <LinearLayout style="@style/Row">
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:hint="Text" style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/editText" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="text"/>
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:id="@+id/btnSendText" android:text="Senden"/>
+                <Button style="@style/Key" android:id="@+id/btnEndText" android:text="Eingabe beenden"/>
+            </LinearLayout>
+            <TextView style="@style/Heading" android:text="Bildschirmspiegelung"/>
+            <TextView style="@style/Hint" android:text="Öffnet die Übertragen-Einstellungen von Android. Ob der Fernseher dort erscheint, hängt vom Handy ab."/>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:id="@+id/btnCast" android:text="Übertragen-Einstellungen öffnen"/>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+    <ScrollView android:id="@+id/pageSetup" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:visibility="gone">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
+            <TextView style="@style/Heading" android:text="Fernseher"/>
+            <LinearLayout style="@style/Row">
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:hint="IP-Adresse des Fernsehers" style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/editIp" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="numberDecimal"/>
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:id="@+id/btnSaveIp" android:text="Speichern + verbinden"/>
+                <Button style="@style/Key" android:id="@+id/btnScan" android:text="Im Netzwerk suchen"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/scanList" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:id="@+id/btnConnect" android:text="Verbinden"/>
+                <Button style="@style/Key" android:id="@+id/btnResetPair" android:text="Kopplung zurücksetzen"/>
+            </LinearLayout>
+            <TextView style="@style/Hint" android:text="Beim ersten Verbinden erscheint am Fernseher eine Abfrage – bitte „Zulassen“ wählen."/>
+            <TextView style="@style/Heading" android:text="Einschalten aus Standby (Wake-on-LAN)"/>
+            <LinearLayout style="@style/Row">
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:hint="MAC-Adresse (AA:BB:CC:DD:EE:FF)" style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/editMac" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="text"/>
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:id="@+id/btnSaveMac" android:text="MAC speichern"/>
+                <Button style="@style/Key" android:id="@+id/btnInfo" android:text="Geräteinfo abrufen"/>
+            </LinearLayout>
+            <TextView style="@style/Hint" android:text="„Geräteinfo abrufen“ übernimmt die WLAN-MAC (wifiMac) automatisch, wenn der Fernseher an ist."/>
+            <TextView android:id="@+id/txtInfo" android:layout_width="match_parent" android:layout_height="wrap_content" android:textIsSelectable="true" android:typeface="monospace" android:textSize="11sp"/>
+            <TextView style="@style/Heading" android:text="Key-Code testen"/>
+            <LinearLayout style="@style/Row">
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:hint="Key-Code, z. B. KEY_INFO" style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/editKey" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="textCapCharacters"/>
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:hint="Halten (Sek.), leer = Klick" style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/editHold" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="numberDecimal"/>
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+            <LinearLayout style="@style/Row">
+                <Button style="@style/Key" android:id="@+id/btnSendKey" android:text="Senden"/>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
