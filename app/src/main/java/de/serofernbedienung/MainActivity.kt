@@ -33,6 +33,11 @@ class MainActivity : AppCompatActivity(), TvConnection.Listener {
         setupSetupPage()
         setupAppsPage()
         findViewById<Button>(R.id.btnWol).setOnClickListener { wakeOnLan() }
+        // Laut openHAB-Doku: Drehen per 4 s langem Druck auf KEY_MULTI_VIEW (Fernseher bis 2023).
+        findViewById<Button>(R.id.btnRotate).setOnClickListener {
+            tv.holdKey("KEY_MULTI_VIEW", 4.0)
+            if (tv.connected) toast("Drehen: Taste wird 4 s gehalten …")
+        }
 
         if (prefs.ip == null) {
             findViewById<TabLayout>(R.id.tabs).getTabAt(2)?.select()

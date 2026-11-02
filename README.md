@@ -30,6 +30,7 @@ Alternativ das Projekt in Android Studio öffnen und "Build > Build APK(s)" wäh
   per WebSocket oder REST starten
 - Texteingabe per Handy-Tastatur (`SendInputString`)
 - Wake-on-LAN (MAC manuell oder aus Geräteinfo `wifiMac`)
+- Drehen-Taste: hält KEY_MULTI_VIEW 4 s gedrückt (Quelle: openHAB-Doku zur Dreh-Halterung, für den Sero nicht belegt)
 - Key-Code-Test, auch mit Gedrückthalten (Sekunden)
 - Button zu den Android-Übertragen-Einstellungen (Bildschirmspiegelung)
 

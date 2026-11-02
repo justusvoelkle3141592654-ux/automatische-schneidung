@@ -7,7 +7,9 @@
             <LinearLayout style="@style/Row">
                 <Button style="@style/Key" android:text="Ein/Aus" android:tag="KEY_POWER"/>
                 <Button style="@style/Key" android:id="@+id/btnWol" android:text="Einschalten (WoL)"/>
+                <Button style="@style/Key" android:id="@+id/btnRotate" android:text="Drehen"/>
             </LinearLayout>
+            <TextView style="@style/Hint" android:text="Drehen: hält KEY_MULTI_VIEW 4 Sekunden gedrückt (nicht offiziell belegt)."/>
             <TextView style="@style/Heading" android:text="Lautstärke / Programm"/>
             <LinearLayout style="@style/Row">
                 <Button style="@style/Key" android:text="Laut +" android:tag="KEY_VOLUP"/>
