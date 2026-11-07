@@ -1,0 +1,39 @@
+{
+  "_doc": {
+    "focus_x / focus_y": "Fokuspunkt als Anteil der Bildbreite/-hoehe (0..1). null = automatisch (schaerfste Flammen-/Holzregion).",
+    "blur_strength": "Maximaler Unschaerfekreis-Radius in Prozent der Bildbreite; gilt fuer den groessten im Bild vorkommenden Tiefenabstand zur Fokusebene. Stark = 2.0.",
+    "dof_tolerance": "Tiefenbereich um die Fokusebene, der scharf bleibt (Anteil des normierten Tiefenbereichs 0..1).",
+    "layers": "Anzahl Tiefenebenen fuer die Scheibenunschaerfe (12..16).",
+    "highlight_boost": "Zusaetzliche Verstaerkung kleiner Lichtpunkte vor dem Weichzeichnen (nur in unscharfen Bereichen).",
+    "exposure_ev": "Belichtungskorrektur in Blendenstufen (linear angewendet).",
+    "shoulder_start": "Linearer Wert, ab dem die Lichter-Schulter beginnt.",
+    "shoulder_white": "Wert in Schulter-Einheiten, der auf Weiss abgebildet wird (groesser = staerkere Kompression).",
+    "chroma_threshold / chroma_strength": "Saettigungsdaempfung (OKLab-Chroma) oberhalb der Schwelle, gewichtet auf Rot/Orange.",
+    "shadow_lift": "Leichte Schattenanhebung (OKLab L).",
+    "contrast": "Staerke der sanften S-Kurve (0 = aus).",
+    "vignette": "Randabdunklung (0 = aus).",
+    "guided_eps": "Glaettung der Tiefenkanten (Guided Filter). Kleiner = Tiefenkanten folgen Bildkanten enger."
+  },
+  "defaults": {
+    "focus_x": null,
+    "focus_y": null,
+    "blur_strength": 2.0,
+    "dof_tolerance": 0.03,
+    "layers": 14,
+    "highlight_boost": 0.6,
+    "exposure_ev": 0.0,
+    "shoulder_start": 0.55,
+    "shoulder_white": 1.15,
+    "chroma_threshold": 0.12,
+    "chroma_strength": 0.35,
+    "shadow_lift": 0.02,
+    "contrast": 0.08,
+    "vignette": 0.0,
+    "guided_eps": 0.004
+  },
+  "images": {
+    "feuer": {
+      "source": "photos/originals/feuer.jpg"
+    }
+  }
+}

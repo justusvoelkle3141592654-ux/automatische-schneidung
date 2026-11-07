@@ -1,0 +1,115 @@
+{
+  "name": "feuer",
+  "source": "photos/originals/feuer.jpg",
+  "size": [
+    3072,
+    4096
+  ],
+  "color_space": "Display P3",
+  "focus": {
+    "x": 0.3652,
+    "y": 0.938,
+    "source": "auto",
+    "disparity": 0.3713
+  },
+  "max_blur_radius_px": 63.2,
+  "layers": [
+    {
+      "disparity": -0.0133,
+      "radius_px": 37.42,
+      "coverage": 0.1615
+    },
+    {
+      "disparity": 0.0636,
+      "radius_px": 29.3,
+      "coverage": 0.1891
+    },
+    {
+      "disparity": 0.1405,
+      "radius_px": 21.18,
+      "coverage": 0.0834
+    },
+    {
+      "disparity": 0.2174,
+      "radius_px": 13.07,
+      "coverage": 0.1294
+    },
+    {
+      "disparity": 0.2944,
+      "radius_px": 4.95,
+      "coverage": 0.1083
+    },
+    {
+      "disparity": 0.3713,
+      "radius_px": 0.0,
+      "coverage": 0.1321
+    },
+    {
+      "disparity": 0.4482,
+      "radius_px": 4.95,
+      "coverage": 0.1296
+    },
+    {
+      "disparity": 0.5251,
+      "radius_px": 13.07,
+      "coverage": 0.0193
+    },
+    {
+      "disparity": 0.602,
+      "radius_px": 21.18,
+      "coverage": 0.0012
+    },
+    {
+      "disparity": 0.679,
+      "radius_px": 29.3,
+      "coverage": 0.0013
+    },
+    {
+      "disparity": 0.7559,
+      "radius_px": 37.42,
+      "coverage": 0.0024
+    },
+    {
+      "disparity": 0.8328,
+      "radius_px": 45.53,
+      "coverage": 0.0056
+    },
+    {
+      "disparity": 0.9097,
+      "radius_px": 53.65,
+      "coverage": 0.0168
+    },
+    {
+      "disparity": 0.9867,
+      "radius_px": 61.77,
+      "coverage": 0.0189
+    },
+    {
+      "disparity": 1.0636,
+      "radius_px": 69.88,
+      "coverage": 0.0012
+    }
+  ],
+  "params": {
+    "focus_x": null,
+    "focus_y": null,
+    "blur_strength": 2.0,
+    "dof_tolerance": 0.03,
+    "layers": 14,
+    "highlight_boost": 0.6,
+    "exposure_ev": 0.0,
+    "shoulder_start": 0.55,
+    "shoulder_white": 1.15,
+    "chroma_threshold": 0.12,
+    "chroma_strength": 0.35,
+    "shadow_lift": 0.02,
+    "contrast": 0.08,
+    "vignette": 0.0,
+    "guided_eps": 0.004,
+    "source": "photos/originals/feuer.jpg"
+  },
+  "clipped_any_channel_pct": 4.14,
+  "clipped_all_channels_pct": 1.45,
+  "seconds": 36.5,
+  "depth_model": "depth-anything/Depth-Anything-V2-Base-hf"
+}

@@ -1,0 +1,8 @@
+# CPU-Torch: pip install torch --index-url https://download.pytorch.org/whl/cpu
+numpy==2.5.4
+opencv-python-headless==5.0.0.93
+pillow==13.0.0
+imageio==2.38.1
+tifffile==2026.10.15
+torch==2.15.0
+transformers==5.22.1
