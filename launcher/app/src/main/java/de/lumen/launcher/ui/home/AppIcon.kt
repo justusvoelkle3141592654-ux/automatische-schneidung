@@ -154,6 +154,7 @@ fun HomeTile(
     highlighted: Boolean = false,
     work: Boolean = false,
     onRemove: (() -> Unit)? = null,
+    labelColor: Color? = null,
     icon: @Composable (Modifier) -> Unit,
 ) {
     var pressed by remember { mutableStateOf(false) }
@@ -199,7 +200,7 @@ fun HomeTile(
             Spacer(Modifier.height(5.dp))
             BasicText(
                 label,
-                style = LumenType.iconLabel.copy(
+                style = (if (labelColor != null) LumenType.iconLabel.copy(color = labelColor, shadow = null) else LumenType.iconLabel).copy(
                     fontSize = LumenType.iconLabel.fontSize * settings.labelScale,
                     lineHeight = LumenType.iconLabel.lineHeight * settings.labelScale,
                     textAlign = TextAlign.Center,

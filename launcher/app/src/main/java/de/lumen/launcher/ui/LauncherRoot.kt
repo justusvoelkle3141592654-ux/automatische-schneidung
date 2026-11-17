@@ -197,4 +197,7 @@ private fun Toast(c: LauncherController, statusTop: androidx.compose.ui.unit.Dp)
 /** Overlays added in later phases (library, search, control center, notifications, overview, settings). */
 @Composable
 fun OverlayHost(c: LauncherController, backdrop: de.lumen.launcher.ui.glass.Backdrop) {
+    de.lumen.launcher.ui.library.LibraryOverlay(c, backdrop)
+    de.lumen.launcher.ui.search.SearchOverlay(c, backdrop)
+    de.lumen.launcher.ui.library.CategoryPickerSheet(c, backdrop)
 }

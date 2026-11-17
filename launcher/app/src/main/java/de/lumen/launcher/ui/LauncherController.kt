@@ -319,6 +319,11 @@ class LauncherController(
         if (isLandscape) { drag.pending = null; showToast("Anordnen ist im Hochformat möglich"); return }
         drag.pending = null
         menu = null
+        // Dragging an app out of the library or search places it on the home screen.
+        if (p.payload is DragPayload.FromLibrary) {
+            if (isOpen(Overlay.LIBRARY)) close(Overlay.LIBRARY)
+            if (isOpen(Overlay.SEARCH)) close(Overlay.SEARCH)
+        }
         drag.grab = pointer - p.bounds.topLeft
         drag.pointer = pointer
         drag.page = pager?.currentPage ?: 0

@@ -88,4 +88,19 @@ class ScreenshotTest {
         compose.mainClock.advanceTimeBy(1200)
         compose.onRoot().captureRoboImage("$out/context_menu.png")
     }
+
+    @Test fun library() {
+        setUp(block = { c -> c.open(de.lumen.launcher.ui.Overlay.LIBRARY) })
+        compose.mainClock.advanceTimeBy(1500)
+        compose.onRoot().captureRoboImage("$out/library.png")
+    }
+
+    @Test fun search_query() {
+        setUp(block = { c ->
+            c.recordLaunch(TestFixtures.key(9)); c.recordLaunch(TestFixtures.key(6))
+            c.open(de.lumen.launcher.ui.Overlay.SEARCH)
+        })
+        compose.mainClock.advanceTimeBy(1500)
+        compose.onRoot().captureRoboImage("$out/search.png")
+    }
 }
