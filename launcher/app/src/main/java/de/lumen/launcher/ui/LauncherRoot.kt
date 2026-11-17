@@ -205,4 +205,8 @@ fun OverlayHost(c: LauncherController, backdrop: de.lumen.launcher.ui.glass.Back
     de.lumen.launcher.ui.widgets.WidgetPickerSheet(c, backdrop)
     de.lumen.launcher.ui.widgets.WidgetEditorSheet(c, backdrop)
     de.lumen.launcher.ui.widgets.RemindersSheet(c, backdrop)
+    de.lumen.launcher.ui.overview.OverviewOverlay(c, backdrop)
+    de.lumen.launcher.ui.settings.PageManagerSheet(c, backdrop)
+    de.lumen.launcher.ui.settings.SettingsOverlay(c, backdrop)
+    de.lumen.launcher.ui.settings.OnboardingSheet(c, backdrop)
 }

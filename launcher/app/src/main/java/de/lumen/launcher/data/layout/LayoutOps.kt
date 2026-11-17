@@ -266,6 +266,37 @@ object LayoutOps {
         )
     }
 
+    /**
+     * Adapts every page to a new grid size. Items that no longer fit move to additional pages,
+     * so nothing is ever lost when the grid shrinks.
+     */
+    fun applyGrid(layout: HomeLayout, cols: Int, rows: Int): HomeLayout {
+        var nextId = layout.nextId
+        val pages = mutableListOf<HomePage>()
+        val overflow = mutableListOf<HomeItem>()
+        for (p in layout.pages) {
+            val r = GridMath.reflow(p.items, cols, rows)
+            pages += p.copy(items = r.placed)
+            overflow += r.overflow
+        }
+        val queue = ArrayDeque(overflow)
+        while (queue.isNotEmpty()) {
+            val items = mutableListOf<HomeItem>()
+            val it = queue.iterator()
+            while (it.hasNext()) {
+                val item = it.next()
+                val w = item.cell.w.coerceAtMost(cols)
+                val h = item.cell.h.coerceAtMost(rows)
+                val cell = GridMath.findFree(items, w, h, cols, rows) ?: continue
+                items += item.moved(cell)
+                it.remove()
+            }
+            if (items.isEmpty()) break
+            pages += HomePage(nextId++, items)
+        }
+        return layout.copy(pages = pages, nextId = nextId)
+    }
+
     // ------------------------------------------------------------------ defaults
 
     /**

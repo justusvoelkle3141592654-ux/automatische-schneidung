@@ -248,6 +248,8 @@ fun Modifier.backdropBlur(
 ): Modifier {
     val blurLayer = rememberGraphicsLayer()
     val pos = remember { floatArrayOf(0f, 0f) }
+    val strength = LocalSettings.current.blurStrength.coerceIn(0f, 1f)
+    val scaledRadius = radius * (0.35f + 0.9f * strength)
     return this
         .onGloballyPositioned {
             val p = it.positionInRoot()
@@ -258,7 +260,7 @@ fun Modifier.backdropBlur(
             if (a <= 0.001f) return@drawBehind
             val src = backdrop.layer
             if (Build.VERSION.SDK_INT >= 31 && src != null) {
-                val r = radius.toPx() * a
+                val r = scaledRadius.toPx() * a
                 blurLayer.renderEffect = if (r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
                 blurLayer.record {
                     translate(backdrop.origin.x - pos[0], backdrop.origin.y - pos[1]) { drawLayer(src) }

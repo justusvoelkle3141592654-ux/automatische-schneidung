@@ -115,4 +115,13 @@ class LayoutOpsTest {
         assertEquals(ids.size, ids.toSet().size)
         assertTrue(l.nextId > ids.max())
     }
+
+    @Test fun applyGrid_keepsEverything() {
+        val items = (0 until 24).map { AppItem(200L + it, Cell(it % 4, it / 4), k("g$it")) }
+        val l = HomeLayout(pages = listOf(HomePage(1, items)), nextId = 500)
+        val r = LayoutOps.applyGrid(l, 3, 5)
+        assertEquals(items.map { it.app }.toSet(), r.placedApps())
+        r.pages.forEach { p -> p.items.forEach { assertTrue(it.cell.right <= 3 && it.cell.bottom <= 5) } }
+        assertTrue(r.pages.size >= 2)
+    }
 }

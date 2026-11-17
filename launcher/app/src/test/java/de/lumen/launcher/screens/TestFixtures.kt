@@ -67,7 +67,7 @@ object TestFixtures {
     fun install(graph: AppGraph) {
         val byKey = fakeApps.mapIndexed { i, f -> key(i).value to f }.toMap()
         graph.icons.testIconProvider = { app -> byKey[app.key.value]?.let { icon(it) } }
-        graph.settings.update { it.copy(addNewAppsToHome = false) }
+        graph.settings.update { it.copy(addNewAppsToHome = false, onboardingDone = true) }
         graph.library.update { it.copy(knownApps = fakeApps.indices.map { i -> key(i).value }.toSet()) }
         graph.layout.set(layout())
         graph.apps.setAppsForTest(apps())

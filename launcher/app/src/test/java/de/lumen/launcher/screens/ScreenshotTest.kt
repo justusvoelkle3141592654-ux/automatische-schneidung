@@ -145,6 +145,18 @@ class ScreenshotTest {
         compose.onRoot().captureRoboImage("$out/widget_gallery.png")
     }
 
+    @Test fun settings_root() {
+        setUp({ it.copy(themeMode = de.lumen.launcher.data.settings.ThemeMode.DARK) }, block = { c -> c.settingsOpen = true })
+        compose.mainClock.advanceTimeBy(1500)
+        compose.onRoot().captureRoboImage("$out/settings.png")
+    }
+
+    @Test fun overview() {
+        setUp(block = { c -> listOf(9, 6, 4).forEach { c.recordLaunch(TestFixtures.key(it)) }; c.open(de.lumen.launcher.ui.Overlay.OVERVIEW) })
+        compose.mainClock.advanceTimeBy(1500)
+        compose.onRoot().captureRoboImage("$out/overview.png")
+    }
+
     companion object {
         const val WEATHER_SAMPLE = """{"latitude":48.12743,"longitude":11.576928,"current":{"time":"2026-11-17T18:15","interval":900,"temperature_2m":12.7,"weather_code":0,"is_day":0},"hourly":{"time":["2026-11-17T18:00","2026-11-17T19:00","2026-11-17T20:00","2026-11-17T21:00","2026-11-17T22:00","2026-11-17T23:00"],"temperature_2m":[12.8,12.5,11.9,11.0,10.3,10.5],"weather_code":[0,0,1,1,0,3]},"daily":{"time":["2026-11-17","2026-11-18","2026-11-19","2026-11-20","2026-11-21"],"weather_code":[61,80,80,80,80],"temperature_2m_max":[13.9,12.0,9.1,9.2,7.6],"temperature_2m_min":[6.5,7.8,6.2,6.6,1.9]}}"""
     }

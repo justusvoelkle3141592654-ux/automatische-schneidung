@@ -139,7 +139,7 @@ fun SearchOverlay(c: LauncherController, backdrop: Backdrop) {
                 ) {
                     val q = query.trim()
                     if (q.isEmpty()) {
-                        Suggestions(c, visible, lib.usage, now)
+                        if (de.lumen.launcher.ui.theme.Lumen.settings.searchShowSuggestions) Suggestions(c, visible, lib.usage, now)
                     } else {
                         Results(c, ctx, q, SearchEngine.search(visible, q, lib.usage, now, 12))
                     }

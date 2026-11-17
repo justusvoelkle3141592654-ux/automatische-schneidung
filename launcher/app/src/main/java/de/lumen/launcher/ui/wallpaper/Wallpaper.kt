@@ -191,7 +191,7 @@ object WallpaperRenderer {
      * Produces the glass sampling texture: 1/8 resolution, saturation boost (glass "vibrancy"),
      * then a 3-pass box blur (≈ gaussian). Drawn upscaled with bilinear filtering it is perfectly smooth.
      */
-    fun blurForGlass(src: Bitmap): Bitmap {
+    fun blurForGlass(src: Bitmap, strength: Float = 0.7f): Bitmap {
         val factor = 8
         val w = (src.width / factor).coerceAtLeast(8)
         val h = (src.height / factor).coerceAtLeast(8)
@@ -201,7 +201,7 @@ object WallpaperRenderer {
         Canvas(small).drawBitmap(src, Rect(0, 0, src.width, src.height), Rect(0, 0, w, h), paint)
         val px = IntArray(w * h)
         small.getPixels(px, 0, w, 0, 0, w, h)
-        val radius = (w / 18).coerceAtLeast(2)
+        val radius = ((w / 18f) * (0.35f + 1.3f * strength.coerceIn(0f, 1f))).toInt().coerceAtLeast(1)
         repeat(3) { boxBlur(px, w, h, radius) }
         small.setPixels(px, 0, w, 0, 0, w, h)
         return small
@@ -248,7 +248,7 @@ fun rememberWallpaperState(settings: LauncherSettings, screen: IntSize, darkThem
     // In dark mode light wallpapers are dimmed slightly, like the system does.
     val autoDim = if (darkTheme && (settings.wallpaperMode == WallpaperMode.CUSTOM || preset.isLight)) 0.22f else 0f
     val dim = (settings.wallpaperDim + autoDim).coerceAtMost(0.8f)
-    val key = listOf(settings.wallpaperMode, settings.wallpaperPreset, settings.customWallpaperFile, screen, dim)
+    val key = listOf(settings.wallpaperMode, settings.wallpaperPreset, settings.customWallpaperFile, screen, dim, settings.blurStrength)
     val state by produceState(WallpaperState.Empty, key) {
         if (screen.width <= 0 || screen.height <= 0) return@produceState
         value = withContext(Dispatchers.Default) {
@@ -267,7 +267,7 @@ fun rememberWallpaperState(settings: LauncherSettings, screen: IntSize, darkThem
             if (bmp == null) {
                 WallpaperState(null, null, screen, false, key)
             } else {
-                val blurred = WallpaperRenderer.blurForGlass(bmp)
+                val blurred = WallpaperRenderer.blurForGlass(bmp, settings.blurStrength)
                 // blurScale is relative to screen pixels
                 WallpaperState(bmp.asImageBitmap(), blurred.asImageBitmap(), screen, light && dim < 0.2f, key)
             }

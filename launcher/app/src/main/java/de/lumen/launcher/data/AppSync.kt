@@ -42,6 +42,9 @@ class AppSync(
         }
     }
 
+    /** Re-runs the sync immediately (e.g. after resetting the layout). */
+    fun resync() = sync(repo.apps.value)
+
     private fun sync(apps: List<AppInfo>) {
         if (apps.isEmpty()) return
         val installed = apps.map { it.key }.toSet()
