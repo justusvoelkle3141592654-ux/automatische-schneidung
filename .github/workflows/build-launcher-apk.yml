@@ -1,0 +1,62 @@
+name: Build Lumen Launcher APK
+
+on:
+  push:
+    branches: [ "claude/**" ]
+    paths:
+      - "launcher/**"
+      - ".github/workflows/build-launcher-apk.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: launcher
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Build APKs
+        run: ./gradlew assembleDebug assembleRelease --no-daemon
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumen-launcher-apks
+          path: |
+            launcher/app/build/outputs/apk/debug/app-debug.apk
+            launcher/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Publish APK as a GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: lumen-launcher-${{ github.run_number }}
+          name: Lumen Launcher (build ${{ github.run_number }})
+          body: Automatisch gebaute APKs aus Commit ${{ github.sha }}. app-release.apk ist optimiert und mit dem Debug-Schlüssel signiert.
+          files: |
+            launcher/app/build/outputs/apk/release/app-release.apk
+            launcher/app/build/outputs/apk/debug/app-debug.apk
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
