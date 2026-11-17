@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -118,7 +119,7 @@ fun ContextMenuOverlay(c: LauncherController, backdrop: Backdrop) {
             val screenW = constraints.maxWidth.toFloat()
             val screenH = constraints.maxHeight.toFloat()
             val a = menu.anchor
-            val menuW = 280.dp
+            val menuW = 300.dp
             val menuWpx = with(density) { menuW.toPx() }
             val rowH = with(density) { 46.dp.toPx() }
             val estH = entries.size * rowH + with(density) { 12.dp.toPx() }
@@ -170,7 +171,7 @@ private fun MenuRow(e: MenuEntry, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .heightIn(min = 44.dp)
             .background(if (pressed) colors.fill else Color.Transparent)
             .pointerInput(e) {
                 detectTapGestures(
@@ -178,10 +179,10 @@ private fun MenuRow(e: MenuEntry, onClick: () -> Unit) {
                     onTap = { onClick() },
                 )
             }
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BasicText(e.title, style = LumenType.body.copy(color = tint), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        BasicText(e.title, style = LumenType.callout.copy(color = tint), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(10.dp))
         when {
             e.bitmap != null -> Image(e.bitmap, null, Modifier.size(22.dp))
