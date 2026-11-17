@@ -36,6 +36,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.geometry.Rect as CRect
 
+/** Things only the Activity can do (system dialogs with results). */
+interface ActivityBridge {
+    fun startScreenRecording()
+    fun requestPermission(permission: String, onResult: (Boolean) -> Unit)
+    fun pickImage(onResult: (android.net.Uri?) -> Unit)
+    fun startForResult(intent: android.content.Intent, onResult: (resultCode: Int, data: android.content.Intent?) -> Unit)
+}
+
 enum class Overlay { LIBRARY, SEARCH, CONTROL_CENTER, NOTIFICATIONS, OVERVIEW }
 
 /** Animated, interactively draggable visibility of one overlay (0 = closed, 1 = open). */
@@ -140,6 +148,7 @@ class LauncherController(
     val homeZoom = Animatable(1f)
 
     var view: View? = null
+    var bridge: ActivityBridge? = null
     var haptic: (Haptic) -> Unit = {}
     var lockScreen: () -> Boolean = { false }
     var expandStatusBar: (notifications: Boolean) -> Unit = {}

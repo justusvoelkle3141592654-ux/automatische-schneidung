@@ -14,14 +14,69 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import android.media.projection.MediaProjectionManager
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import de.lumen.launcher.system.LumenLockService
+import de.lumen.launcher.system.ScreenRecordService
+import de.lumen.launcher.ui.ActivityBridge
 import de.lumen.launcher.ui.Haptic
 import de.lumen.launcher.ui.LauncherController
 import de.lumen.launcher.ui.LauncherRoot
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), ActivityBridge {
 
     private var controller: LauncherController? = null
+
+    private var permissionCallback: ((Boolean) -> Unit)? = null
+    private var imageCallback: ((android.net.Uri?) -> Unit)? = null
+    private var resultCallback: ((Int, Intent?) -> Unit)? = null
+
+    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        permissionCallback?.invoke(ok); permissionCallback = null
+    }
+    private val imageLauncher = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        imageCallback?.invoke(uri); imageCallback = null
+    }
+    private val resultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        resultCallback?.invoke(r.resultCode, r.data); resultCallback = null
+    }
+    private val captureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val data = r.data
+        if (r.resultCode == RESULT_OK && data != null) ScreenRecordService.start(this, r.resultCode, data)
+        else controller?.showToast("Aufnahme abgebrochen")
+    }
+
+    override fun startScreenRecording() {
+        if (ScreenRecordService.recording.value) { ScreenRecordService.stop(this); return }
+        val go = {
+            val mpm = getSystemService(MediaProjectionManager::class.java)
+            captureLauncher.launch(mpm.createScreenCaptureIntent())
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            // The recording notification (with the stop button) needs this permission.
+            requestPermission(android.Manifest.permission.POST_NOTIFICATIONS) { go() }
+        } else go()
+    }
+
+    override fun requestPermission(permission: String, onResult: (Boolean) -> Unit) {
+        if (checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED) { onResult(true); return }
+        permissionCallback = onResult
+        permissionLauncher.launch(permission)
+    }
+
+    override fun pickImage(onResult: (android.net.Uri?) -> Unit) {
+        imageCallback = onResult
+        imageLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+
+    override fun startForResult(intent: Intent, onResult: (Int, Intent?) -> Unit) {
+        resultCallback = onResult
+        try { resultLauncher.launch(intent) } catch (t: Throwable) { resultCallback = null; onResult(RESULT_CANCELED, null) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +106,8 @@ class MainActivity : ComponentActivity() {
             val c = remember { LauncherController(g, scope) }
             controller = c
             c.view = view
+            c.bridge = this
+            c.lockScreen = { LumenLockService.lock() }
             c.isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
             c.haptic = { type ->
                 if (g.settings.value.gestures.haptics) {
@@ -92,6 +149,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         controller?.onReturnHome()
+        graph.system.refresh()
     }
 
     override fun onStop() {

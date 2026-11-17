@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Lumen</string>
+    <string name="lock_service_label">Lumen Sperren</string>
+    <string name="lock_service_description">Ermöglicht Lumen, den Bildschirm per Doppeltippen auf eine freie Fläche zu sperren und die System-Mitteilungen zu öffnen. Es werden keine Bildschirminhalte gelesen.</string>
 </resources>

@@ -199,5 +199,7 @@ private fun Toast(c: LauncherController, statusTop: androidx.compose.ui.unit.Dp)
 fun OverlayHost(c: LauncherController, backdrop: de.lumen.launcher.ui.glass.Backdrop) {
     de.lumen.launcher.ui.library.LibraryOverlay(c, backdrop)
     de.lumen.launcher.ui.search.SearchOverlay(c, backdrop)
+    de.lumen.launcher.ui.control.ControlCenter(c, backdrop)
+    de.lumen.launcher.ui.notifications.NotificationCenter(c, backdrop)
     de.lumen.launcher.ui.library.CategoryPickerSheet(c, backdrop)
 }

@@ -38,6 +38,7 @@ class AppGraph(val context: Context) {
     val iconPacks = IconPackManager(context)
     val icons = IconLoader(context, apps, iconPacks)
     val appSync = AppSync(context, apps, layout, library, settings, scope)
+    val system by lazy { de.lumen.launcher.system.SystemControls(context) }
 
     fun flushAll() {
         settings.flush()

@@ -103,4 +103,16 @@ class ScreenshotTest {
         compose.mainClock.advanceTimeBy(1500)
         compose.onRoot().captureRoboImage("$out/search.png")
     }
+
+    @Test fun control_center() {
+        setUp(block = { c -> c.open(de.lumen.launcher.ui.Overlay.CONTROL_CENTER) })
+        compose.mainClock.advanceTimeBy(1500)
+        compose.onRoot().captureRoboImage("$out/control_center.png")
+    }
+
+    @Test fun notifications_permission() {
+        setUp(block = { c -> c.open(de.lumen.launcher.ui.Overlay.NOTIFICATIONS) })
+        compose.mainClock.advanceTimeBy(1500)
+        compose.onRoot().captureRoboImage("$out/notifications.png")
+    }
 }
