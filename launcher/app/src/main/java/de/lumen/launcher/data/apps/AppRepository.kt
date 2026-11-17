@@ -114,6 +114,14 @@ class AppRepository(
         _loaded.value = true
     }
 
+    /** Test hook: injects a fixed app list (used by JVM screenshot tests). */
+    @androidx.annotation.VisibleForTesting
+    fun setAppsForTest(list: List<AppInfo>) {
+        reloadJob?.cancel()
+        _apps.value = list
+        _loaded.value = true
+    }
+
     fun activityInfo(key: AppKey): LauncherActivityInfo? = activityInfos[key]
 
     fun find(key: AppKey): AppInfo? = _apps.value.firstOrNull { it.key == key }

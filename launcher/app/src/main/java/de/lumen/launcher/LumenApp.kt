@@ -3,6 +3,7 @@ package de.lumen.launcher
 import android.app.Application
 import android.content.Context
 import de.lumen.launcher.core.JsonStore
+import de.lumen.launcher.data.AppSync
 import de.lumen.launcher.data.apps.AppRepository
 import de.lumen.launcher.data.apps.IconLoader
 import de.lumen.launcher.data.apps.IconPackManager
@@ -36,6 +37,7 @@ class AppGraph(val context: Context) {
     val apps = AppRepository(context, scope)
     val iconPacks = IconPackManager(context)
     val icons = IconLoader(context, apps, iconPacks)
+    val appSync = AppSync(context, apps, layout, library, settings, scope)
 
     fun flushAll() {
         settings.flush()

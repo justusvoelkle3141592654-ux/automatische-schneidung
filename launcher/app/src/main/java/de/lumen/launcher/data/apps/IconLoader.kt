@@ -79,10 +79,14 @@ class IconLoader(
     fun renderDrawable(drawable: Drawable, spec: IconSpec): IconImage =
         compose(drawable, spec, fromPack = false)
 
+    /** Test hook: supplies icons when no LauncherActivityInfo exists (JVM screenshot tests). */
+    @androidx.annotation.VisibleForTesting
+    var testIconProvider: ((AppInfo) -> Drawable?)? = null
+
     private fun render(app: AppInfo, spec: IconSpec): IconImage? {
         val density = context.resources.displayMetrics.densityDpi
         val packIcon = spec.iconPack?.let { iconPacks.iconFor(it, app.packageName, app.className, density) }
-        val drawable = packIcon ?: repo.activityInfo(app.key)?.getIcon(density) ?: return null
+        val drawable = packIcon ?: repo.activityInfo(app.key)?.getIcon(density) ?: testIconProvider?.invoke(app) ?: return null
         return compose(drawable, spec, fromPack = packIcon != null)
     }
 
