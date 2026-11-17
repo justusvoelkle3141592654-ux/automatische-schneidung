@@ -76,7 +76,7 @@ import de.lumen.launcher.ui.MenuState
 import de.lumen.launcher.ui.MenuTarget
 import de.lumen.launcher.ui.PendingDrag
 import de.lumen.launcher.ui.common.animatePlacement
-import de.lumen.launcher.ui.common.pressable
+import de.lumen.launcher.ui.glass.liquidPress
 import de.lumen.launcher.ui.glass.GlassStyle
 import de.lumen.launcher.ui.glass.glass
 import de.lumen.launcher.ui.theme.Lumen
@@ -419,7 +419,7 @@ private fun PageIndicator(c: LauncherController, pager: PagerState, count: Int) 
                 Modifier
                     .height(26.dp)
                     .glass(CircleShape, GlassStyle(elevation = 0.3f))
-                    .pressable(c.editMode) { c.pageManagerOpen = true }
+                    .liquidPress(c.editMode) { c.pageManagerOpen = true }
                     .padding(horizontal = 11.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -436,7 +436,7 @@ private fun PageIndicator(c: LauncherController, pager: PagerState, count: Int) 
                 Modifier
                     .height(HomeDimens.indicatorHeight)
                     .glass(CircleShape, GlassStyle(elevation = 0.4f))
-                    .pressable { c.open(de.lumen.launcher.ui.Overlay.SEARCH) }
+                    .liquidPress { c.open(de.lumen.launcher.ui.Overlay.SEARCH) }
                     .padding(start = 12.dp, end = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -466,7 +466,7 @@ private fun EditModeBar(c: LauncherController, statusTop: androidx.compose.ui.un
                 Modifier
                     .size(36.dp)
                     .glass(CircleShape, GlassStyle(elevation = 0.6f))
-                    .pressable { c.widgetPickerOpen = true },
+                    .liquidPress { c.widgetPickerOpen = true },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Rounded.Add, "Widget hinzufügen", tint = Color.White, modifier = Modifier.size(22.dp))
@@ -475,7 +475,7 @@ private fun EditModeBar(c: LauncherController, statusTop: androidx.compose.ui.un
                 Modifier
                     .height(36.dp)
                     .glass(RoundedCornerShape(50), GlassStyle(elevation = 0.6f))
-                    .pressable { c.editMode = false }
+                    .liquidPress { c.editMode = false }
                     .padding(horizontal = 18.dp),
                 contentAlignment = Alignment.Center,
             ) {
