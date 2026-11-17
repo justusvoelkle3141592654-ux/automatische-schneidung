@@ -159,6 +159,9 @@ fun HomeTile(
 ) {
     var pressed by remember { mutableStateOf(false) }
     var iconCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val tap by androidx.compose.runtime.rememberUpdatedState(onTap)
+    val long by androidx.compose.runtime.rememberUpdatedState(onLongPress)
+    val edit by androidx.compose.runtime.rememberUpdatedState(onEditPress)
     val hl by animateFloatAsState(if (highlighted) 1.12f else 1f, Lumen.motion.bouncy(), label = "hl")
     val settings = Lumen.settings
     Column(
@@ -176,16 +179,17 @@ fun HomeTile(
                         onPress = { pos ->
                             pressed = true
                             val c = iconCoords
-                            if (onEditPress != null && c != null && c.isAttached) {
-                                onEditPress(c.boundsInRoot(), c.positionInRoot() + pos)
+                            val e = edit
+                            if (e != null && c != null && c.isAttached) {
+                                e(c.boundsInRoot(), c.positionInRoot() + pos)
                             }
                             tryAwaitRelease()
                             pressed = false
                         },
-                        onTap = { iconCoords?.takeIf { it.isAttached }?.let { onTap(it.boundsInWindow()) } },
+                        onTap = { iconCoords?.takeIf { it.isAttached }?.let { tap(it.boundsInWindow()) } },
                         onLongPress = { pos ->
                             pressed = false
-                            iconCoords?.takeIf { it.isAttached }?.let { onLongPress(it.boundsInRoot(), it.positionInRoot() + pos) }
+                            iconCoords?.takeIf { it.isAttached }?.let { long(it.boundsInRoot(), it.positionInRoot() + pos) }
                         },
                     )
                 },

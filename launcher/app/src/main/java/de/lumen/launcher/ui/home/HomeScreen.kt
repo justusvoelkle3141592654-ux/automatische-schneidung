@@ -101,8 +101,8 @@ fun HomeScreen(c: LauncherController, layout: HomeLayout, modifier: Modifier = M
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val iconSize = s.iconSizeDp.dp
     val landscape = c.isLandscape
+    val iconSizeSetting = s.iconSizeDp.dp
 
     // Keep the pager in range when pages are removed.
     LaunchedEffect(pageCount) {
@@ -113,8 +113,11 @@ fun HomeScreen(c: LauncherController, layout: HomeLayout, modifier: Modifier = M
         val screenW = constraints.maxWidth.toFloat()
         val screenH = constraints.maxHeight.toFloat()
         SideEffect { c.geometry.screen = Size(screenW, screenH) }
-        val dockIcon = iconSize * s.dockScale
-        val dockHeight = dockIcon + HomeDimens.dockInnerPad * 2
+        // In landscape the cells are short: scale icons to the available cell height.
+        val landscapeCellH = (maxHeight - statusTop - navBottom - 160.dp) / s.gridColumns
+        val iconSize = if (landscape) minOf(iconSizeSetting, landscapeCellH * 0.62f).coerceAtLeast(28.dp) else iconSizeSetting
+        val dockIcon = if (landscape) minOf(iconSizeSetting * s.dockScale, 46.dp) else iconSizeSetting * s.dockScale
+        val dockHeight = dockIcon + (if (landscape) 8.dp else HomeDimens.dockInnerPad) * 2
 
         Column(Modifier.fillMaxSize()) {
             val editTop by animateDpAsState(if (c.editMode && c.drag.active == null) 46.dp else 0.dp, Lumen.motion.smooth(), label = "editTop")
@@ -165,15 +168,11 @@ fun HomeScreen(c: LauncherController, layout: HomeLayout, modifier: Modifier = M
                 DropGhost(c, iconSize)
             }
 
-            Box(Modifier.fillMaxWidth().height(HomeDimens.indicatorHeight + 14.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().height(HomeDimens.indicatorHeight + if (landscape) 4.dp else 14.dp), contentAlignment = Alignment.Center) {
                 PageIndicator(c, pager, pageCount)
             }
-            if (!landscape) {
-                Dock(c, layout.dock, dockIcon, Modifier.height(dockHeight))
-                Spacer(Modifier.height(navBottom + 10.dp))
-            } else {
-                Spacer(Modifier.height(navBottom + 4.dp))
-            }
+            Dock(c, layout.dock, dockIcon, Modifier.height(dockHeight).then(if (landscape) Modifier.padding(horizontal = 120.dp) else Modifier))
+            Spacer(Modifier.height(navBottom + if (landscape) 4.dp else 10.dp))
         }
         EditModeBar(c, statusTop)
     }

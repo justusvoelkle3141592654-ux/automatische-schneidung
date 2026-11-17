@@ -210,7 +210,7 @@ fun GlassSwitch(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifie
     ) {
         Box(
             Modifier
-                .offset(x = 20.dp * x)
+                .offset { androidx.compose.ui.unit.IntOffset((20.dp.toPx() * x).toInt(), 0) }
                 .size(27.dp)
                 .glass(CircleShape, GlassStyle(tint = Color.White, sampleWallpaper = false, elevation = 0.5f, sheen = 0.4f))
         )

@@ -27,6 +27,11 @@
     <!-- "Uninstall" entry in the app context menu. -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
+    <!-- Optional hardware: the launcher works without it. -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <!-- Package visibility (Android 11+): launchable apps, icon packs and widget providers. -->
     <queries>
         <intent>

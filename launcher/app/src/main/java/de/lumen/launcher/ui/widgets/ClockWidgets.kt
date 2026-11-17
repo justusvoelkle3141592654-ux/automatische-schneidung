@@ -176,14 +176,18 @@ fun DateWidget(item: WidgetItem) {
     val now = rememberNow(false)
     val accent = Color(0xFFFF6961)
     when (item.size) {
-        WidgetSize.SMALL -> Column(Modifier.fillMaxSize().padding(16.dp)) {
-            BasicText(SimpleDateFormat("EEEE", Locale.GERMANY).format(now).uppercase(Locale.GERMANY), style = LumenType.footnote.copy(color = accent, fontWeight = FontWeight.Bold))
-            BasicText(
-                SimpleDateFormat("d", Locale.GERMANY).format(now),
-                style = LumenType.largeTitle.copy(fontSize = 64.sp, lineHeight = 66.sp, fontWeight = FontWeight.Light, color = widgetText),
-            )
-            Spacer(Modifier.weight(1f))
-            BasicText(SimpleDateFormat("MMMM yyyy", Locale.GERMANY).format(now), style = LumenType.subhead.copy(color = widgetText.copy(alpha = 0.8f)))
+        WidgetSize.SMALL -> androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp)) {
+            val compact = maxHeight < 120.dp
+            val big = if (compact) 40.sp else 64.sp
+            Column(Modifier.fillMaxSize()) {
+                BasicText(SimpleDateFormat("EEEE", Locale.GERMANY).format(now).uppercase(Locale.GERMANY), style = LumenType.footnote.copy(color = accent, fontWeight = FontWeight.Bold))
+                BasicText(
+                    SimpleDateFormat("d", Locale.GERMANY).format(now),
+                    style = LumenType.largeTitle.copy(fontSize = big, lineHeight = big * 1.04f, fontWeight = FontWeight.Light, color = widgetText),
+                )
+                Spacer(Modifier.weight(1f))
+                BasicText(SimpleDateFormat(if (compact) "MMM yyyy" else "MMMM yyyy", Locale.GERMANY).format(now), style = LumenType.subhead.copy(color = widgetText.copy(alpha = 0.8f)), maxLines = 1)
+            }
         }
         else -> Row(Modifier.fillMaxSize().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column {
