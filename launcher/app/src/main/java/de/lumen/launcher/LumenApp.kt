@@ -39,11 +39,17 @@ class AppGraph(val context: Context) {
     val icons = IconLoader(context, apps, iconPacks)
     val appSync = AppSync(context, apps, layout, library, settings, scope)
     val system by lazy { de.lumen.launcher.system.SystemControls(context) }
+    val widgetHost by lazy { de.lumen.launcher.widgets.WidgetHostManager(context) }
+    val weather by lazy { de.lumen.launcher.widgets.WeatherRepository(context, scope) }
+    val calendar by lazy { de.lumen.launcher.widgets.CalendarRepository(context, scope) }
+    val battery by lazy { de.lumen.launcher.widgets.BatteryMonitor(context) }
+    val reminders = JsonStore(File(dir, "reminders.json"), de.lumen.launcher.widgets.ReminderList.serializer(), { de.lumen.launcher.widgets.ReminderList() }, scope)
 
     fun flushAll() {
         settings.flush()
         layout.flush()
         library.flush()
+        reminders.flush()
     }
 }
 

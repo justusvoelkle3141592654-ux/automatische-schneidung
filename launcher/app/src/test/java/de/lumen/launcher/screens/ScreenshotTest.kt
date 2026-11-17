@@ -12,6 +12,10 @@ import de.lumen.launcher.data.settings.LauncherSettings
 import de.lumen.launcher.ui.LauncherController
 import de.lumen.launcher.ui.LauncherRoot
 import org.junit.Rule
+import de.lumen.launcher.data.layout.WidgetItem as W
+import de.lumen.launcher.data.layout.Cell as C
+import de.lumen.launcher.data.layout.WidgetKind as K
+import de.lumen.launcher.data.layout.WidgetSize as S
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -114,5 +118,34 @@ class ScreenshotTest {
         setUp(block = { c -> c.open(de.lumen.launcher.ui.Overlay.NOTIFICATIONS) })
         compose.mainClock.advanceTimeBy(1500)
         compose.onRoot().captureRoboImage("$out/notifications.png")
+    }
+
+    @Test fun widgets_page() {
+        setUp(block = { c ->
+            val g = c.graph
+            g.weather.putForTest(48.14, 11.58, de.lumen.launcher.widgets.WeatherRepository.parseForecast(WEATHER_SAMPLE, System.currentTimeMillis()))
+            g.reminders.set(de.lumen.launcher.widgets.ReminderList(listOf(
+                de.lumen.launcher.widgets.Reminder(1, "Präsentation vorbereiten"), de.lumen.launcher.widgets.Reminder(2, "Milch kaufen"), de.lumen.launcher.widgets.Reminder(3, "Paket abholen")), 4))
+            g.layout.update { l ->
+                l.copy(pages = listOf(de.lumen.launcher.data.layout.HomePage(900, listOf(
+                    W(901, C(0, 0, 4, 2), K.WEATHER, S.MEDIUM, mapOf("city" to "München", "lat" to "48.14", "lon" to "11.58")),
+                    W(902, C(0, 2, 2, 2), K.BATTERY, S.SMALL),
+                    W(903, C(2, 2, 2, 2), K.REMINDERS, S.SMALL),
+                    W(904, C(0, 4, 4, 2), K.SHORTCUTS, S.MEDIUM),
+                ))))
+            }
+        })
+        compose.mainClock.advanceTimeBy(800)
+        compose.onRoot().captureRoboImage("$out/widgets.png")
+    }
+
+    @Test fun widget_gallery() {
+        setUp(block = { c -> c.editMode = true; c.widgetPickerOpen = true })
+        compose.mainClock.advanceTimeBy(1500)
+        compose.onRoot().captureRoboImage("$out/widget_gallery.png")
+    }
+
+    companion object {
+        const val WEATHER_SAMPLE = """{"latitude":48.12743,"longitude":11.576928,"current":{"time":"2026-11-17T18:15","interval":900,"temperature_2m":12.7,"weather_code":0,"is_day":0},"hourly":{"time":["2026-11-17T18:00","2026-11-17T19:00","2026-11-17T20:00","2026-11-17T21:00","2026-11-17T22:00","2026-11-17T23:00"],"temperature_2m":[12.8,12.5,11.9,11.0,10.3,10.5],"weather_code":[0,0,1,1,0,3]},"daily":{"time":["2026-11-17","2026-11-18","2026-11-19","2026-11-20","2026-11-21"],"weather_code":[61,80,80,80,80],"temperature_2m_max":[13.9,12.0,9.1,9.2,7.6],"temperature_2m_min":[6.5,7.8,6.2,6.6,1.9]}}"""
     }
 }

@@ -42,6 +42,8 @@ interface ActivityBridge {
     fun requestPermission(permission: String, onResult: (Boolean) -> Unit)
     fun pickImage(onResult: (android.net.Uri?) -> Unit)
     fun startForResult(intent: android.content.Intent, onResult: (resultCode: Int, data: android.content.Intent?) -> Unit)
+    /** Opens an app widget's configuration activity (AppWidgetHost API). */
+    fun configureWidget(appWidgetId: Int, onResult: (Boolean) -> Unit)
 }
 
 enum class Overlay { LIBRARY, SEARCH, CONTROL_CENTER, NOTIFICATIONS, OVERVIEW }
@@ -286,6 +288,9 @@ class LauncherController(
     fun updateLayout(f: (HomeLayout) -> HomeLayout) = graph.layout.update(f)
 
     fun removeFromHome(itemId: Long) {
+        (LayoutOps.findItem(graph.layout.value, itemId) as? de.lumen.launcher.data.layout.NativeWidgetItem)?.let {
+            graph.widgetHost.delete(it.appWidgetId)
+        }
         updateLayout { LayoutOps.normalizeFolders(LayoutOps.removeItem(it, itemId)) }
     }
 

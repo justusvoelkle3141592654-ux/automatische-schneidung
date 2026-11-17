@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -87,7 +88,8 @@ fun WidgetHost(c: LauncherController, item: HomeItem, hidden: Boolean, modifier:
             is WidgetItem -> Box(
                 Modifier
                     .fillMaxSize()
-                    .glass(SmoothRoundedShape(HomeDimens.widgetCorner), GlassStyle(elevation = 0.8f)),
+                    .glass(SmoothRoundedShape(HomeDimens.widgetCorner), GlassStyle(elevation = 0.8f))
+                    .clip(SmoothRoundedShape(HomeDimens.widgetCorner)),
             ) {
                 BuiltinWidget(c, item)
             }

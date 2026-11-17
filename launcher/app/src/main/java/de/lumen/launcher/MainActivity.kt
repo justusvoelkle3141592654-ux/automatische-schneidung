@@ -73,6 +73,28 @@ class MainActivity : ComponentActivity(), ActivityBridge {
         imageLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
+    private var configureCallback: ((Boolean) -> Unit)? = null
+
+    override fun configureWidget(appWidgetId: Int, onResult: (Boolean) -> Unit) {
+        configureCallback = onResult
+        try {
+            graph.widgetHost.host.startAppWidgetConfigureActivityForResult(this, appWidgetId, 0, REQ_CONFIGURE, null)
+        } catch (t: Throwable) {
+            configureCallback = null
+            onResult(false)
+        }
+    }
+
+    @Deprecated("AppWidgetHost delivers the configuration result through this callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_CONFIGURE) {
+            configureCallback?.invoke(resultCode == RESULT_OK)
+            configureCallback = null
+        }
+    }
+
     override fun startForResult(intent: Intent, onResult: (Int, Intent?) -> Unit) {
         resultCallback = onResult
         try { resultLauncher.launch(intent) } catch (t: Throwable) { resultCallback = null; onResult(RESULT_CANCELED, null) }
@@ -152,9 +174,19 @@ class MainActivity : ComponentActivity(), ActivityBridge {
         graph.system.refresh()
     }
 
+    override fun onStart() {
+        super.onStart()
+        graph.widgetHost.startListening()
+    }
+
     override fun onStop() {
         super.onStop()
+        graph.widgetHost.stopListening()
         controller?.cancelDrag()
         graph.flushAll()
+    }
+
+    companion object {
+        private const val REQ_CONFIGURE = 4711
     }
 }

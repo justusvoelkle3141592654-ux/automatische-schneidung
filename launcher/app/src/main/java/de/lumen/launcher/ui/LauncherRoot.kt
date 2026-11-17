@@ -202,4 +202,7 @@ fun OverlayHost(c: LauncherController, backdrop: de.lumen.launcher.ui.glass.Back
     de.lumen.launcher.ui.control.ControlCenter(c, backdrop)
     de.lumen.launcher.ui.notifications.NotificationCenter(c, backdrop)
     de.lumen.launcher.ui.library.CategoryPickerSheet(c, backdrop)
+    de.lumen.launcher.ui.widgets.WidgetPickerSheet(c, backdrop)
+    de.lumen.launcher.ui.widgets.WidgetEditorSheet(c, backdrop)
+    de.lumen.launcher.ui.widgets.RemindersSheet(c, backdrop)
 }

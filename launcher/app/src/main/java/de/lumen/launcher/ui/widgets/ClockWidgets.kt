@@ -174,7 +174,7 @@ private fun DrawScope.hand(deg: Float, length: Float, width: Float, color: Color
 @Composable
 fun DateWidget(item: WidgetItem) {
     val now = rememberNow(false)
-    val accent = androidx.compose.ui.graphics.lerp(Lumen.colors.accent, Color.White, 0.35f)
+    val accent = Color(0xFFFF6961)
     when (item.size) {
         WidgetSize.SMALL -> Column(Modifier.fillMaxSize().padding(16.dp)) {
             BasicText(SimpleDateFormat("EEEE", Locale.GERMANY).format(now).uppercase(Locale.GERMANY), style = LumenType.footnote.copy(color = accent, fontWeight = FontWeight.Bold))
